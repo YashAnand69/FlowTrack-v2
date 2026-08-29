@@ -14,6 +14,7 @@ import {
 import { formatCurrency } from '@/lib/utils/formatters'
 import { useAuth } from '@/lib/context/AuthContext'
 import { useTheme } from '@/lib/context/ThemeContext'
+import { LiquidCard } from '@/components/ui/LiquidCard'
 
 interface RevenueChartProps {
   data: Array<{
@@ -52,81 +53,83 @@ export function RevenueChart({ data }: RevenueChartProps) {
       initial={shouldReduceMotion ? {} : { opacity: 0, y: 16 }}
       animate={shouldReduceMotion ? {} : { opacity: 1, y: 0 }}
       transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 25 }}
-      className="glass-card rounded-2xl p-6"
+      className="w-full"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-zinc-950 dark:text-white">
-            Revenue Performance
-          </h2>
-          <p className="text-xs text-zinc-400 mt-0.5 font-normal">
-            6-Month rolling settlement curve & cashflow velocity
-          </p>
+      <LiquidCard className="p-6" tiltStrength={4} glareOpacity={0.08}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-zinc-950 dark:text-white">
+              Revenue Performance
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5 font-normal">
+              6-Month rolling settlement curve & cashflow velocity
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-black/[0.04] dark:bg-white/[0.06] border border-black/5 dark:border-white/10 px-2.5 py-1 rounded-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+              Monthly Settlements
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-black/[0.04] dark:bg-white/[0.06] border border-black/5 dark:border-white/10 px-2.5 py-1 rounded-lg">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-            Monthly Settlements
-          </span>
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="monochromeRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={strokeColor} stopOpacity={isDark ? 0.2 : 0.12} />
+                  <stop offset="95%" stopColor={strokeColor} stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="currentColor"
+                className="text-zinc-200/50 dark:text-zinc-800/40"
+              />
+
+              <XAxis
+                dataKey="month"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: isDark ? '#71717a' : '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }}
+                dy={10}
+              />
+
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: isDark ? '#71717a' : '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }}
+                tickFormatter={(val) => {
+                  if (val >= 1000) return `${val / 1000}k`
+                  return val
+                }}
+                dx={-5}
+              />
+
+              <Tooltip content={<CustomTooltip />} />
+
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke={strokeColor}
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#monochromeRevenueGradient)"
+                activeDot={{
+                  r: 5,
+                  fill: strokeColor,
+                  stroke: isDark ? '#09090b' : '#ffffff',
+                  strokeWidth: 2,
+                }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-      </div>
-
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="monochromeRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={strokeColor} stopOpacity={isDark ? 0.2 : 0.12} />
-                <stop offset="95%" stopColor={strokeColor} stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
-
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="currentColor"
-              className="text-zinc-200/50 dark:text-zinc-800/40"
-            />
-
-            <XAxis
-              dataKey="month"
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: isDark ? '#71717a' : '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }}
-              dy={10}
-            />
-
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: isDark ? '#71717a' : '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }}
-              tickFormatter={(val) => {
-                if (val >= 1000) return `${val / 1000}k`
-                return val
-              }}
-              dx={-5}
-            />
-
-            <Tooltip content={<CustomTooltip />} />
-
-            <Area
-              type="monotone"
-              dataKey="revenue"
-              stroke={strokeColor}
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#monochromeRevenueGradient)"
-              activeDot={{
-                r: 5,
-                fill: strokeColor,
-                stroke: isDark ? '#09090b' : '#ffffff',
-                strokeWidth: 2,
-              }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      </LiquidCard>
     </motion.div>
   )
 }

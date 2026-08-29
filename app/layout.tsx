@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/lib/context/ThemeContext'
 import { ToastProvider } from '@/lib/context/ToastContext'
 import { AuthProvider } from '@/lib/context/AuthContext'
 import { FluidDynamicsCanvas } from '@/components/ui/FluidDynamicsCanvas'
+import { FluidCursor } from '@/components/ui/FluidCursor'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,8 +30,11 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             <AuthProvider>
-              {/* Interactive Fluid Dynamics Particle Mesh Canvas */}
+              {/* Interactive Hydrodynamic Fluid Canvas */}
               <FluidDynamicsCanvas />
+
+              {/* Lusion-style Liquid Magnetic Cursor Follower */}
+              <FluidCursor />
 
               {/* Main App Content */}
               <div className="relative z-10">{children}</div>
