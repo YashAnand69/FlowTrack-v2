@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User data isolation: Each user has their own root document and subcollections
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Profiles
+      match /profile/{profileId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Clients
+      match /clients/{clientId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Invoices
+      match /invoices/{invoiceId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Line Items
+        match /items/{itemId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+    }
+  }
+}

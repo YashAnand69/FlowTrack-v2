@@ -12,9 +12,11 @@ import {
   LogOut,
   Database,
   Building2,
+  Flame,
 } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeContext'
 import { useAuth } from '@/lib/context/AuthContext'
+import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 interface TopBarProps {
@@ -55,6 +57,12 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+  const backendLabel = isFirebaseConfigured
+    ? 'Firebase Firestore'
+    : isSupabaseConfigured
+    ? 'Supabase PostgreSQL'
+    : 'Local Storage Engine'
 
   return (
     <header className="h-16 sticky top-0 z-20 bg-white/70 dark:bg-[#09090b]/80 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/[0.08] px-4 sm:px-8 flex items-center justify-between gap-4 transition-colors duration-200 shadow-[inset_0_-1px_0_rgba(0,0,0,0.03)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.04)]">
@@ -151,10 +159,12 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
                 </p>
 
                 <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-mono font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-white/[0.05] px-2 py-1 rounded-md border border-zinc-200/50 dark:border-white/[0.05]">
-                  <Database className="w-3 h-3 text-zinc-900 dark:text-white" />
-                  <span>
-                    {isSupabaseConfigured ? 'Supabase Connected' : 'Local Storage Engine'}
-                  </span>
+                  {isFirebaseConfigured ? (
+                    <Flame className="w-3 h-3 text-amber-500" />
+                  ) : (
+                    <Database className="w-3 h-3 text-zinc-900 dark:text-white" />
+                  )}
+                  <span>{backendLabel}</span>
                 </div>
               </div>
 

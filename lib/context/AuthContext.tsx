@@ -1,20 +1,33 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase/client'
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User as FirebaseUser,
+} from 'firebase/auth'
+import { auth, googleProvider, isFirebaseConfigured } from '@/lib/firebase/config'
+import { firestoreService } from '@/lib/firebase/firestore-service'
 import { dbService } from '@/lib/supabase/db-service'
 import type { Profile } from '@/lib/supabase/database.types'
-import type { User, Session } from '@supabase/supabase-js'
+
+export interface UserSession {
+  id: string
+  email: string
+  displayName?: string | null
+  photoURL?: string | null
+}
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
+  user: UserSession | null
   profile: Profile | null
   isLoading: boolean
-  isDemoMode: boolean
-  signIn: (email: string, pass: string) => Promise<{ error: string | null }>
-  signUp: (email: string, pass: string, businessName?: string) => Promise<{ error: string | null }>
+  signIn: (email: string, pass: string) => Promise<{ error?: string }>
+  signUp: (email: string, pass: string, businessName: string) => Promise<{ error?: string }>
+  signInWithGoogle: () => Promise<{ error?: string }>
   signOut: () => Promise<void>
   loginDemoUser: () => void
   refreshProfile: () => Promise<void>
@@ -22,183 +35,228 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const DEMO_USER: User = {
+const DEMO_USER: UserSession = {
   id: 'demo-user-id',
-  app_metadata: {},
-  user_metadata: { business_name: 'Rivera Design Studio' },
-  aud: 'authenticated',
-  created_at: new Date().toISOString(),
   email: 'alex@riveradesign.co',
-} as User
+  displayName: 'Alex Rivera',
+  photoURL: null,
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<UserSession | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDemoMode, setIsDemoMode] = useState(false)
-  const router = useRouter()
 
-  const loadProfile = useCallback(async (userId?: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
+      if (isFirebaseConfigured) {
+        const p = await firestoreService.getProfile(userId)
+        if (p) {
+          setProfile(p)
+          return
+        }
+      }
       const p = await dbService.getProfile(userId)
       setProfile(p)
     } catch (e) {
-      console.error('Error loading profile:', e)
+      console.error('Failed to load profile:', e)
     }
   }, [])
 
   useEffect(() => {
-    async function initAuth() {
-      setIsLoading(true)
-
-      // 1. Check if user saved demo session
-      const savedDemo = typeof window !== 'undefined' ? localStorage.getItem('flowtrack_demo_session') : null
-      if (savedDemo === 'true') {
-        setUser(DEMO_USER)
-        setIsDemoMode(true)
-        await loadProfile('demo-user-id')
-        setIsLoading(false)
-        return
-      }
-
-      // 2. Check Supabase
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: { session: currentSession } } = await supabase.auth.getSession()
-          if (currentSession) {
-            setSession(currentSession)
-            setUser(currentSession.user)
-            await loadProfile(currentSession.user.id)
-          } else {
-            // Default to demo user if no auth session exists yet for effortless walkthrough
-            setUser(DEMO_USER)
-            setIsDemoMode(true)
-            await loadProfile('demo-user-id')
+    if (isFirebaseConfigured) {
+      const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+        if (fbUser) {
+          const userSession: UserSession = {
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            displayName: fbUser.displayName,
+            photoURL: fbUser.photoURL,
           }
-        } catch (e) {
-          console.warn('Supabase auth session check fallback to demo:', e)
+          setUser(userSession)
+          await fetchProfile(fbUser.uid)
+        } else {
+          // Check if demo user was active
+          const isDemo = localStorage.getItem('flowtrack_is_demo') === 'true'
+          if (isDemo) {
+            setUser(DEMO_USER)
+            await fetchProfile(DEMO_USER.id)
+          } else {
+            setUser(null)
+            setProfile(null)
+          }
+        }
+        setIsLoading(false)
+      })
+
+      return () => unsubscribe()
+    } else {
+      // Fallback: local session demo engine
+      const stored = localStorage.getItem('flowtrack_active_user')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          setUser(parsed)
+          fetchProfile(parsed.id)
+        } catch {
           setUser(DEMO_USER)
-          setIsDemoMode(true)
-          await loadProfile('demo-user-id')
+          fetchProfile(DEMO_USER.id)
         }
       } else {
-        // Fallback demo user
         setUser(DEMO_USER)
-        setIsDemoMode(true)
-        await loadProfile('demo-user-id')
+        fetchProfile(DEMO_USER.id)
       }
-
       setIsLoading(false)
     }
+  }, [fetchProfile])
 
-    initAuth()
-
-    if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-        setSession(newSession)
-        setUser(newSession?.user || null)
-        if (newSession?.user) {
-          setIsDemoMode(false)
-          localStorage.removeItem('flowtrack_demo_session')
-          await loadProfile(newSession.user.id)
+  const signIn = async (email: string, pass: string) => {
+    try {
+      if (isFirebaseConfigured) {
+        const cred = await signInWithEmailAndPassword(auth, email, pass)
+        const userSession: UserSession = {
+          id: cred.user.uid,
+          email: cred.user.email || '',
+          displayName: cred.user.displayName,
         }
-      })
-
-      return () => {
-        subscription.unsubscribe()
+        setUser(userSession)
+        await fetchProfile(cred.user.uid)
+        localStorage.removeItem('flowtrack_is_demo')
+        return {}
       }
-    }
-  }, [loadProfile])
 
-  const signIn = async (email: string, pass: string): Promise<{ error: string | null }> => {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Demo/Fallback Auth
+      const demoUser: UserSession = {
+        id: `user-${email.replace(/[^a-zA-Z0-9]/g, '')}`,
         email,
-        password: pass,
-      })
-      if (error) return { error: error.message }
-      if (data.user) {
-        setUser(data.user)
-        setIsDemoMode(false)
-        localStorage.removeItem('flowtrack_demo_session')
-        await loadProfile(data.user.id)
-        router.push('/dashboard')
+        displayName: email.split('@')[0],
       }
-      return { error: null }
+      setUser(demoUser)
+      localStorage.setItem('flowtrack_active_user', JSON.stringify(demoUser))
+      localStorage.removeItem('flowtrack_is_demo')
+      await fetchProfile(demoUser.id)
+      return {}
+    } catch (err: any) {
+      return { error: err.message || 'Failed to sign in' }
     }
-
-    // Demo sign in
-    loginDemoUser()
-    router.push('/dashboard')
-    return { error: null }
   }
 
-  const signUp = async (email: string, pass: string, businessName?: string): Promise<{ error: string | null }> => {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: {
-            business_name: businessName || 'My Freelance Business',
+  const signUp = async (email: string, pass: string, businessName: string) => {
+    try {
+      if (isFirebaseConfigured) {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass)
+        const userSession: UserSession = {
+          id: cred.user.uid,
+          email: cred.user.email || '',
+          displayName: businessName,
+        }
+        setUser(userSession)
+        // Automatically create user profile in Firestore
+        await firestoreService.updateProfile(
+          {
+            business_name: businessName,
+            business_email: email,
+            currency: 'USD',
           },
-        },
-      })
-      if (error) return { error: error.message }
-      if (data.user) {
-        setUser(data.user)
-        setIsDemoMode(false)
-        localStorage.removeItem('flowtrack_demo_session')
-        await loadProfile(data.user.id)
-        router.push('/dashboard')
+          cred.user.uid
+        )
+        await fetchProfile(cred.user.uid)
+        localStorage.removeItem('flowtrack_is_demo')
+        return {}
       }
-      return { error: null }
-    }
 
-    // Demo sign up
-    loginDemoUser()
-    if (businessName) {
-      await dbService.updateProfile({ business_name: businessName, business_email: email })
-      await loadProfile('demo-user-id')
+      // Demo/Fallback Sign Up
+      const demoUser: UserSession = {
+        id: `user-${Date.now()}`,
+        email,
+        displayName: businessName,
+      }
+      setUser(demoUser)
+      localStorage.setItem('flowtrack_active_user', JSON.stringify(demoUser))
+      localStorage.removeItem('flowtrack_is_demo')
+      await dbService.updateProfile({ business_name: businessName, business_email: email }, demoUser.id)
+      await fetchProfile(demoUser.id)
+      return {}
+    } catch (err: any) {
+      return { error: err.message || 'Failed to create account' }
     }
-    router.push('/dashboard')
-    return { error: null }
+  }
+
+  const signInWithGoogle = async () => {
+    try {
+      if (isFirebaseConfigured) {
+        const cred = await signInWithPopup(auth, googleProvider)
+        const userSession: UserSession = {
+          id: cred.user.uid,
+          email: cred.user.email || '',
+          displayName: cred.user.displayName,
+          photoURL: cred.user.photoURL,
+        }
+        setUser(userSession)
+        // Initialize profile if needed
+        const currentProfile = await firestoreService.getProfile(cred.user.uid)
+        if (!currentProfile) {
+          await firestoreService.updateProfile(
+            {
+              business_name: cred.user.displayName || 'My Freelance Studio',
+              business_email: cred.user.email || '',
+              currency: 'USD',
+            },
+            cred.user.uid
+          )
+        }
+        await fetchProfile(cred.user.uid)
+        localStorage.removeItem('flowtrack_is_demo')
+        return {}
+      }
+
+      // Fallback
+      loginDemoUser()
+      return {}
+    } catch (err: any) {
+      return { error: err.message || 'Google sign in failed' }
+    }
   }
 
   const signOut = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut()
+    try {
+      if (isFirebaseConfigured) {
+        await firebaseSignOut(auth)
+      }
+      localStorage.removeItem('flowtrack_active_user')
+      localStorage.removeItem('flowtrack_is_demo')
+      setUser(null)
+      setProfile(null)
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+    } catch (err) {
+      console.error('Error signing out:', err)
     }
-    localStorage.removeItem('flowtrack_demo_session')
-    setUser(null)
-    setSession(null)
-    setProfile(null)
-    setIsDemoMode(false)
-    router.push('/login')
   }
 
   const loginDemoUser = () => {
-    localStorage.setItem('flowtrack_demo_session', 'true')
     setUser(DEMO_USER)
-    setIsDemoMode(true)
-    loadProfile('demo-user-id')
+    localStorage.setItem('flowtrack_active_user', JSON.stringify(DEMO_USER))
+    localStorage.setItem('flowtrack_is_demo', 'true')
+    fetchProfile(DEMO_USER.id)
   }
 
   const refreshProfile = async () => {
-    await loadProfile(user?.id)
+    if (user) {
+      await fetchProfile(user.id)
+    }
   }
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        session,
         profile,
         isLoading,
-        isDemoMode,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
         loginDemoUser,
         refreshProfile,

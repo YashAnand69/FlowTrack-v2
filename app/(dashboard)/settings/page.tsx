@@ -11,7 +11,7 @@ import {
   Check,
   Percent,
   Database,
-  Sparkles,
+  Flame,
 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/context/AuthContext'
 import { useTheme } from '@/lib/context/ThemeContext'
 import { useToast } from '@/lib/context/ToastContext'
 import { dbService } from '@/lib/supabase/db-service'
+import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
@@ -103,6 +104,18 @@ export default function SettingsPage() {
     value: code,
     label: `${meta.label} - ${meta.symbol}`,
   }))
+
+  const activeDatabaseLabel = isFirebaseConfigured
+    ? 'Firebase Auth & Cloud Firestore'
+    : isSupabaseConfigured
+    ? 'Supabase PostgreSQL & RLS'
+    : 'Local Storage Offline Engine'
+
+  const activeDatabaseDesc = isFirebaseConfigured
+    ? 'Connected to Firebase Authentication and Cloud Firestore.'
+    : isSupabaseConfigured
+    ? 'Connected to Supabase PostgreSQL with active Row Level Security.'
+    : 'Add Firebase credentials in .env.local to activate Cloud Firestore.'
 
   return (
     <motion.div
@@ -300,16 +313,18 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-zinc-200/60 dark:border-white/[0.06]">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-zinc-950 dark:text-white flex items-center justify-center">
-                <Database className="w-4 h-4" />
+                {isFirebaseConfigured ? (
+                  <Flame className="w-4 h-4 text-amber-500" />
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
               </div>
               <div>
                 <p className="text-xs font-bold font-mono text-zinc-950 dark:text-white">
-                  {isSupabaseConfigured ? 'Supabase PostgreSQL RLS' : 'Local Storage Engine'}
+                  {activeDatabaseLabel}
                 </p>
                 <p className="text-[11px] text-zinc-400">
-                  {isSupabaseConfigured
-                    ? 'Connected securely with Row Level Security.'
-                    : 'Set NEXT_PUBLIC_SUPABASE_URL in .env to switch to cloud Postgres.'}
+                  {activeDatabaseDesc}
                 </p>
               </div>
             </div>

@@ -12,13 +12,14 @@ import { useToast } from '@/lib/context/ToastContext'
 
 export default function SignUpPage() {
   const router = useRouter()
-  const { signUp } = useAuth()
+  const { signUp, signInWithGoogle } = useAuth()
   const { error: toastError, success: toastSuccess } = useToast()
 
   const [businessName, setBusinessName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [errors, setErrors] = useState<{ businessName?: string; email?: string; password?: string }>({})
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -42,6 +43,20 @@ export default function SignUpPage() {
       toastError('Registration Failed', res.error)
     } else {
       toastSuccess('Studio Initialized', 'Welcome to FlowTrack.')
+      router.push('/dashboard')
+    }
+  }
+
+  const handleGoogleSignUp = async () => {
+    setIsGoogleLoading(true)
+    const res = await signInWithGoogle()
+    setIsGoogleLoading(false)
+
+    if (res.error) {
+      toastError('Google Registration Failed', res.error)
+    } else {
+      toastSuccess('Studio Initialized', 'Signed up with Google.')
+      router.push('/dashboard')
     }
   }
 
@@ -82,6 +97,45 @@ export default function SignUpPage() {
           transition={{ type: 'spring', stiffness: 350, damping: 28 }}
           className="glass-card rounded-2xl p-6 sm:p-8 space-y-5"
         >
+          {/* Google Sign In */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleSignUp}
+            isLoading={isGoogleLoading}
+            className="w-full h-11 gap-2.5 font-medium"
+            leftIcon={
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+            }
+          >
+            Sign up with Google
+          </Button>
+
+          {/* Divider */}
+          <div className="relative flex items-center justify-center">
+            <div className="border-t border-zinc-200 dark:border-white/[0.08] w-full" />
+            <span className="bg-white/80 dark:bg-[#111115] px-3 text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-widest absolute">
+              or email
+            </span>
+          </div>
+
           <form onSubmit={handleSignUp} className="space-y-4">
             <Input
               label="STUDIO / FREELANCER NAME"
@@ -132,7 +186,7 @@ export default function SignUpPage() {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 pt-2 font-mono">
+          <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 pt-1 font-mono">
             Already have an account?{' '}
             <Link
               href="/login"
@@ -145,7 +199,7 @@ export default function SignUpPage() {
 
         <div className="flex items-center justify-center gap-1.5 text-zinc-400 text-xs font-mono">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>PostgreSQL with Row Level Security</span>
+          <span>Firebase Auth & Cloud Firestore Secure Database</span>
         </div>
       </div>
     </div>

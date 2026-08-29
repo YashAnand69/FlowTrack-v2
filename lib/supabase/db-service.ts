@@ -1,4 +1,6 @@
 import { supabase, isSupabaseConfigured } from './client'
+import { firestoreService } from '../firebase/firestore-service'
+import { isFirebaseConfigured } from '../firebase/config'
 import type { Profile, Client, Invoice, InvoiceItem, InvoiceWithDetails, InvoiceStatus } from './database.types'
 
 // Local storage key for demo persistence
@@ -102,7 +104,7 @@ const DEFAULT_DEMO_DATA: DemoDatabase = {
       status: 'sent',
       issue_date: '2026-08-18',
       due_date: '2026-09-01',
-      notes: 'Marketing landing page design and responsive Webflow build.',
+      notes: 'Marketing landing page overhaul and interactive micro-interactions.',
       created_at: '2026-08-18T09:30:00Z',
       updated_at: '2026-08-18T09:30:00Z',
     },
@@ -114,7 +116,7 @@ const DEFAULT_DEMO_DATA: DemoDatabase = {
       status: 'overdue',
       issue_date: '2026-08-02',
       due_date: '2026-08-16',
-      notes: 'Design tokens library and Figma UI components.',
+      notes: 'Please settle past due balance via wire transfer at your earliest convenience.',
       created_at: '2026-08-02T14:00:00Z',
       updated_at: '2026-08-02T14:00:00Z',
     },
@@ -126,7 +128,7 @@ const DEFAULT_DEMO_DATA: DemoDatabase = {
       status: 'draft',
       issue_date: '2026-08-25',
       due_date: '2026-09-08',
-      notes: 'Q3 Brand Assets and quarterly refresh collateral.',
+      notes: 'Q3 Brand Assets and Vector Icon Library.',
       created_at: '2026-08-25T16:20:00Z',
       updated_at: '2026-08-25T16:20:00Z',
     },
@@ -135,7 +137,7 @@ const DEFAULT_DEMO_DATA: DemoDatabase = {
     {
       id: 'item-001',
       invoice_id: 'inv-001',
-      description: 'Brand Identity System & Style Guide',
+      description: 'Brand Identity Design & Guidelines',
       quantity: 1,
       rate: 3200,
       amount: 3200,
@@ -144,7 +146,7 @@ const DEFAULT_DEMO_DATA: DemoDatabase = {
     {
       id: 'item-002',
       invoice_id: 'inv-001',
-      description: 'Custom Icon Set (32 items)',
+      description: 'Vector Iconography Pack (30 custom icons)',
       quantity: 1,
       rate: 1600,
       amount: 1600,
@@ -235,6 +237,10 @@ export const dbService = {
   // PROFILE
   // --------------------------------------------------------------------------
   async getProfile(userId?: string): Promise<Profile> {
+    if (isFirebaseConfigured && userId) {
+      const p = await firestoreService.getProfile(userId)
+      if (p) return p
+    }
     if (isSupabaseConfigured && supabase && userId) {
       const { data, error } = await (supabase.from('profiles') as any)
         .select('*')
@@ -246,6 +252,9 @@ export const dbService = {
   },
 
   async updateProfile(updates: Partial<Profile>, userId?: string): Promise<Profile> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.updateProfile(updates, userId)
+    }
     if (isSupabaseConfigured && supabase && userId) {
       const { data, error } = await (supabase.from('profiles') as any)
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -265,6 +274,9 @@ export const dbService = {
   // CLIENTS
   // --------------------------------------------------------------------------
   async getClients(userId?: string): Promise<Client[]> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.getClients(userId)
+    }
     if (isSupabaseConfigured && supabase && userId) {
       const { data, error } = await (supabase.from('clients') as any)
         .select('*')
@@ -274,7 +286,11 @@ export const dbService = {
     return getDemoDB().clients
   },
 
-  async getClientById(id: string): Promise<Client | null> {
+  async getClientById(id: string, userId?: string): Promise<Client | null> {
+    if (isFirebaseConfigured && userId) {
+      const clients = await firestoreService.getClients(userId)
+      return clients.find((c) => c.id === id) || null
+    }
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await (supabase.from('clients') as any)
         .select('*')
@@ -286,6 +302,9 @@ export const dbService = {
   },
 
   async createClient(client: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client> {
+    if (isFirebaseConfigured) {
+      return firestoreService.createClient(client)
+    }
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await (supabase.from('clients') as any)
         .insert([client])
@@ -306,7 +325,10 @@ export const dbService = {
     return newClient
   },
 
-  async updateClient(id: string, updates: Partial<Client>): Promise<Client> {
+  async updateClient(id: string, updates: Partial<Client>, userId?: string): Promise<Client> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.updateClient(id, updates, userId)
+    }
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await (supabase.from('clients') as any)
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -326,7 +348,10 @@ export const dbService = {
     throw new Error('Client not found')
   },
 
-  async deleteClient(id: string): Promise<void> {
+  async deleteClient(id: string, userId?: string): Promise<void> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.deleteClient(id, userId)
+    }
     if (isSupabaseConfigured && supabase) {
       await (supabase.from('clients') as any).delete().eq('id', id)
       return
@@ -334,7 +359,6 @@ export const dbService = {
 
     const db = getDemoDB()
     db.clients = db.clients.filter((c) => c.id !== id)
-    // Cascade delete associated invoices
     const invoiceIdsToDelete = db.invoices.filter((i) => i.client_id === id).map((i) => i.id)
     db.invoices = db.invoices.filter((i) => i.client_id !== id)
     db.items = db.items.filter((item) => !invoiceIdsToDelete.includes(item.invoice_id))
@@ -345,6 +369,9 @@ export const dbService = {
   // INVOICES
   // --------------------------------------------------------------------------
   async getInvoices(userId?: string): Promise<InvoiceWithDetails[]> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.getInvoices(userId)
+    }
     if (isSupabaseConfigured && supabase && userId) {
       const { data, error } = await (supabase.from('invoices') as any)
         .select(`
@@ -375,7 +402,11 @@ export const dbService = {
     })
   },
 
-  async getInvoiceById(id: string): Promise<InvoiceWithDetails | null> {
+  async getInvoiceById(id: string, userId?: string): Promise<InvoiceWithDetails | null> {
+    if (isFirebaseConfigured && userId) {
+      const all = await firestoreService.getInvoices(userId)
+      return all.find((i) => i.id === id) || null
+    }
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await (supabase.from('invoices') as any)
         .select(`
@@ -414,6 +445,9 @@ export const dbService = {
     invoice: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
     items: Array<Omit<InvoiceItem, 'id' | 'invoice_id' | 'created_at'>>
   ): Promise<InvoiceWithDetails> {
+    if (isFirebaseConfigured) {
+      return firestoreService.createInvoice(invoice, items)
+    }
     if (isSupabaseConfigured && supabase) {
       const { data: invData, error: invError } = await (supabase.from('invoices') as any)
         .insert([invoice])
@@ -476,8 +510,12 @@ export const dbService = {
   async updateInvoice(
     id: string,
     updates: Partial<Invoice>,
-    items?: Array<Omit<InvoiceItem, 'id' | 'invoice_id' | 'created_at'>>
+    items?: Array<Omit<InvoiceItem, 'id' | 'invoice_id' | 'created_at'>>,
+    userId?: string
   ): Promise<InvoiceWithDetails> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.updateInvoice(id, updates, items, userId)
+    }
     if (isSupabaseConfigured && supabase) {
       const { error } = await (supabase.from('invoices') as any)
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -486,7 +524,6 @@ export const dbService = {
       if (error) throw error
 
       if (items) {
-        // Re-create items
         await (supabase.from('invoice_items') as any).delete().eq('invoice_id', id)
         const itemsToInsert = items.map((it) => ({
           invoice_id: id,
@@ -525,11 +562,14 @@ export const dbService = {
     return this.getInvoiceById(id) as Promise<InvoiceWithDetails>
   },
 
-  async markInvoiceAsPaid(id: string): Promise<InvoiceWithDetails> {
-    return this.updateInvoice(id, { status: 'paid' })
+  async markInvoiceAsPaid(id: string, userId?: string): Promise<InvoiceWithDetails> {
+    return this.updateInvoice(id, { status: 'paid' }, undefined, userId)
   },
 
-  async deleteInvoice(id: string): Promise<void> {
+  async deleteInvoice(id: string, userId?: string): Promise<void> {
+    if (isFirebaseConfigured && userId) {
+      return firestoreService.deleteInvoice(id, userId)
+    }
     if (isSupabaseConfigured && supabase) {
       await (supabase.from('invoices') as any).delete().eq('id', id)
       return
@@ -544,8 +584,8 @@ export const dbService = {
   // --------------------------------------------------------------------------
   // CLIENT DETAILED STATS
   // --------------------------------------------------------------------------
-  async getClientInvoiceStats(clientId: string) {
-    const invoices = await this.getInvoices()
+  async getClientInvoiceStats(clientId: string, userId?: string) {
+    const invoices = await this.getInvoices(userId)
     const clientInvoices = invoices.filter((i) => i.client_id === clientId)
     const totalBilled = clientInvoices.reduce((sum, i) => sum + (i.total_amount || 0), 0)
     const totalPaid = clientInvoices
@@ -575,7 +615,6 @@ export const dbService = {
     const currentMonth = now.getMonth()
     const currentYear = now.getFullYear()
 
-    // 1. Total Revenue This Month (Paid invoices issued/paid in current month)
     const paidInvoicesThisMonth = invoices.filter((inv) => {
       if (inv.status !== 'paid') return false
       const d = new Date(inv.issue_date)
@@ -583,7 +622,6 @@ export const dbService = {
     })
     const revenueThisMonth = paidInvoicesThisMonth.reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
 
-    // Last month revenue for trend calculation
     const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
     const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
     const paidInvoicesLastMonth = invoices.filter((inv) => {
@@ -596,18 +634,14 @@ export const dbService = {
       ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 1000) / 10
       : +18.4
 
-    // 2. Outstanding Invoices (Sent or Draft)
     const outstandingInvoices = invoices.filter((inv) => inv.status === 'sent')
     const outstandingAmount = outstandingInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
 
-    // 3. Active Clients
     const activeClientsCount = clients.length
 
-    // 4. Overdue Amount
     const overdueInvoices = invoices.filter((inv) => inv.status === 'overdue')
     const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
 
-    // 5. 6-Month Revenue Data for Line Chart
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const chartData = []
 
@@ -617,7 +651,6 @@ export const dbService = {
       const yVal = d.getFullYear()
       const mLabel = `${monthNames[mIdx]}`
 
-      // Sum all paid invoices in that month
       const monthPaid = invoices.filter((inv) => {
         if (inv.status !== 'paid') return false
         const invDate = new Date(inv.issue_date)
@@ -625,8 +658,6 @@ export const dbService = {
       })
 
       const monthRevenue = monthPaid.reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
-
-      // Fallback realistic baseline if newly created
       const baselineValues = [3200, 4100, 3800, 5600, 6800, 8000]
       const finalRevenue = monthRevenue > 0 ? monthRevenue : baselineValues[5 - i] || 4000
 
@@ -637,7 +668,6 @@ export const dbService = {
       })
     }
 
-    // 6. Recent Activity (Last 5 invoices sorted by update/creation)
     const recentActivity = [...invoices]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5)
