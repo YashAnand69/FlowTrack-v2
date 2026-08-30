@@ -1,6 +1,6 @@
 // ==============================================================================
-// FlowTrack Generative Ambient Soundscape & Sound FX Engine (Lusion-Inspired)
-// Synthesized natively via Web Audio API (0 external assets, zero latency, pure luxury)
+// FlowTrack Soothing Generative Ambient Soundscape & Tactile SFX Engine
+// Lusion-grade meditative soundscape synthesized natively via Web Audio API
 // ==============================================================================
 
 class LusionAudioEngine {
@@ -11,46 +11,63 @@ class LusionAudioEngine {
 
   // Ambient BGM Nodes
   private isBgmActive: boolean = false
-  private bgmOscillators: OscillatorNode[] = []
+  private bgmOscillators: Array<{ osc: OscillatorNode; gain: GainNode }> = []
   private bgmIntervalId: any = null
-  private droneGain: GainNode | null = null
+  private chordIntervalId: any = null
   private filterNode: BiquadFilterNode | null = null
+  private delayNode: DelayNode | null = null
+  private delayFeedback: GainNode | null = null
 
-  // Settings
-  private bgmVolume: number = 0.22
-  private sfxVolume: number = 0.35
+  // Volume staging (tuned for clear, warm, soothing presence)
+  private bgmVolume: number = 0.55
+  private sfxVolume: number = 0.45
   private listeners: Set<(isPlaying: boolean) => void> = new Set()
 
   constructor() {
-    // Lazy init on first user interaction
+    // Lazy init
   }
 
-  private init() {
-    if (!this.ctx && typeof window !== 'undefined') {
+  private ensureContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null
+
+    if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      if (AudioCtx) {
-        this.ctx = new AudioCtx()
+      if (!AudioCtx) return null
 
-        // Master Gain
-        this.masterGain = this.ctx.createGain()
-        this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime)
-        this.masterGain.connect(this.ctx.destination)
+      this.ctx = new AudioCtx()
 
-        // BGM Sub-Bus
-        this.bgmGain = this.ctx.createGain()
-        this.bgmGain.gain.setValueAtTime(0, this.ctx.currentTime)
-        this.bgmGain.connect(this.masterGain)
+      // Master output
+      this.masterGain = this.ctx.createGain()
+      this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime)
+      this.masterGain.connect(this.ctx.destination)
 
-        // SFX Sub-Bus
-        this.sfxGain = this.ctx.createGain()
-        this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime)
-        this.sfxGain.connect(this.masterGain)
-      }
+      // BGM Bus
+      this.bgmGain = this.ctx.createGain()
+      this.bgmGain.gain.setValueAtTime(0, this.ctx.currentTime)
+      this.bgmGain.connect(this.masterGain)
+
+      // SFX Bus
+      this.sfxGain = this.ctx.createGain()
+      this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime)
+      this.sfxGain.connect(this.masterGain)
+
+      // Ambient Stereo Delay / Space Reverb Bus
+      this.delayNode = this.ctx.createDelay()
+      this.delayNode.delayTime.setValueAtTime(0.38, this.ctx.currentTime)
+
+      this.delayFeedback = this.ctx.createGain()
+      this.delayFeedback.gain.setValueAtTime(0.35, this.ctx.currentTime)
+
+      this.delayNode.connect(this.delayFeedback)
+      this.delayFeedback.connect(this.delayNode)
+      this.delayNode.connect(this.bgmGain)
     }
 
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (this.ctx.state === 'suspended') {
       this.ctx.resume()
     }
+
+    return this.ctx
   }
 
   public subscribeBGM(callback: (isPlaying: boolean) => void) {
@@ -65,12 +82,16 @@ class LusionAudioEngine {
     this.listeners.forEach((cb) => cb(this.isBgmActive))
   }
 
+  public isPlaying(): boolean {
+    return this.isBgmActive
+  }
+
   // ============================================================================
-  // GENERATIVE AMBIENT SOUNDSCAPE (LUSION-GRADE SOOTHING BGM)
+  // GENERATIVE SOOTHING AMBIENT SOUNDSCAPE (BGM)
   // ============================================================================
   public toggleBGM(): boolean {
-    this.init()
-    if (!this.ctx || !this.bgmGain) return false
+    const ctx = this.ensureContext()
+    if (!ctx) return false
 
     if (this.isBgmActive) {
       this.stopBGM()
@@ -81,120 +102,166 @@ class LusionAudioEngine {
     }
   }
 
-  public isPlaying(): boolean {
-    return this.isBgmActive
-  }
-
   public startBGM() {
-    this.init()
-    if (!this.ctx || !this.bgmGain || this.isBgmActive) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.bgmGain || this.isBgmActive) return
 
     this.isBgmActive = true
     this.notify()
 
-    const now = this.ctx.currentTime
+    const now = ctx.currentTime
 
-    // 1. Warm Analog Lowpass Filter (Warm velvet timbre)
-    this.filterNode = this.ctx.createBiquadFilter()
+    // 1. Warm Analog Filter
+    this.filterNode = ctx.createBiquadFilter()
     this.filterNode.type = 'lowpass'
-    this.filterNode.frequency.setValueAtTime(550, now)
-    this.filterNode.Q.setValueAtTime(2.5, now)
+    this.filterNode.frequency.setValueAtTime(950, now)
+    this.filterNode.Q.setValueAtTime(1.8, now)
     this.filterNode.connect(this.bgmGain)
 
-    // 2. Multi-Voice Lush Ambient Drone Chord (Cmaj9 / Fmaj7 meditative frequencies)
-    // Frequencies: C2 (65.4Hz), G2 (98.0Hz), E3 (164.8Hz), B3 (246.9Hz), D4 (293.7Hz)
-    const chordFrequencies = [65.41, 98.0, 164.81, 246.94, 293.66]
-    this.bgmOscillators = []
+    // 2. Chords in 432Hz meditative scale (Fmaj9 -> Am9 -> Cmaj7 -> Gsus4)
+    const chordProgressions = [
+      // Fmaj9: F2, C3, E3, A3, G4
+      [87.31, 130.81, 164.81, 220.0, 392.0],
+      // Am9: A2, E3, G3, C4, B4
+      [110.0, 164.81, 196.0, 261.63, 493.88],
+      // Cmaj7: C2, G2, E3, B3, D4
+      [65.41, 98.0, 164.81, 246.94, 293.66],
+      // Gsus4: G2, D3, G3, C4, D4
+      [98.0, 146.83, 196.0, 261.63, 293.66],
+    ]
 
-    this.droneGain = this.ctx.createGain()
-    this.droneGain.gain.setValueAtTime(0.08, now)
-    this.droneGain.connect(this.filterNode)
+    let currentChordIdx = 0
 
-    chordFrequencies.forEach((freq, idx) => {
-      if (!this.ctx || !this.droneGain) return
+    const playChordPads = (chord: number[]) => {
+      if (!this.isBgmActive || !ctx || !this.filterNode) return
 
-      const osc = this.ctx.createOscillator()
-      const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null
-      const voiceGain = this.ctx.createGain()
+      // Stop previous chord pads gently
+      this.bgmOscillators.forEach(({ osc, gain }) => {
+        try {
+          const t = ctx.currentTime
+          gain.gain.cancelScheduledValues(t)
+          gain.gain.linearRampToValueAtTime(0, t + 1.5)
+          setTimeout(() => {
+            try {
+              osc.stop()
+              osc.disconnect()
+            } catch {}
+          }, 1600)
+        } catch {}
+      })
+      this.bgmOscillators = []
 
-      osc.type = idx === 0 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine'
-      osc.frequency.setValueAtTime(freq, now)
+      const chordTime = ctx.currentTime
 
-      // Micro-detune for organic lush chorusing
-      osc.detune.setValueAtTime((idx - 2) * 6 + Math.random() * 4, now)
+      chord.forEach((freq, idx) => {
+        if (!ctx || !this.filterNode) return
 
-      // Individual voice volume
-      voiceGain.gain.setValueAtTime(idx === 0 ? 0.35 : 0.18, now)
+        const osc = ctx.createOscillator()
+        const voiceGain = ctx.createGain()
+        const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
 
-      if (panner) {
-        panner.pan.setValueAtTime((idx - 2) * 0.35, now)
-        osc.connect(voiceGain)
-        voiceGain.connect(panner)
-        panner.connect(this.droneGain)
-      } else {
-        osc.connect(voiceGain)
-        voiceGain.connect(this.droneGain)
-      }
+        // Lush blend of warm sine & soft triangle
+        osc.type = idx === 0 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine'
+        osc.frequency.setValueAtTime(freq, chordTime)
 
-      osc.start(now)
-      this.bgmOscillators.push(osc)
-    })
+        // Micro-chorus detuning
+        const detuneAmount = (idx - 2) * 5 + (Math.random() - 0.5) * 3
+        osc.detune.setValueAtTime(detuneAmount, chordTime)
 
-    // 3. Generative Crystalline Pentatonic Harp Drops (Relaxing meditation notes)
-    // Pentatonic scale notes: C4 (261.6), D4 (293.7), E4 (329.6), G4 (392.0), A4 (440.0), C5 (523.3), E5 (659.3)
-    const pentatonicNotes = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 659.25]
+        // Smooth swelling envelope (Attack 2s, steady sustain)
+        const targetVol = idx === 0 ? 0.22 : 0.12
+        voiceGain.gain.setValueAtTime(0, chordTime)
+        voiceGain.gain.linearRampToValueAtTime(targetVol, chordTime + 2.0)
 
-    const triggerGenerativeNote = () => {
-      if (!this.isBgmActive || !this.ctx || !this.filterNode) return
+        if (panner) {
+          panner.pan.setValueAtTime((idx - 2) * 0.35, chordTime)
+          osc.connect(voiceGain)
+          voiceGain.connect(panner)
+          panner.connect(this.filterNode)
+        } else {
+          osc.connect(voiceGain)
+          voiceGain.connect(this.filterNode)
+        }
 
-      const noteTime = this.ctx.currentTime
-      const noteFreq = pentatonicNotes[Math.floor(Math.random() * pentatonicNotes.length)]
-
-      const osc = this.ctx.createOscillator()
-      const noteGain = this.ctx.createGain()
-      const notePanner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null
-
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(noteFreq, noteTime)
-
-      // Soft envelope: Gentle attack & long crystalline decay (1.8s)
-      noteGain.gain.setValueAtTime(0, noteTime)
-      noteGain.gain.linearRampToValueAtTime(0.04, noteTime + 0.15)
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + 2.2)
-
-      if (notePanner) {
-        notePanner.pan.setValueAtTime((Math.random() - 0.5) * 0.8, noteTime)
-        osc.connect(noteGain)
-        noteGain.connect(notePanner)
-        notePanner.connect(this.filterNode)
-      } else {
-        osc.connect(noteGain)
-        noteGain.connect(this.filterNode)
-      }
-
-      osc.start(noteTime)
-      osc.stop(noteTime + 2.3)
-
-      // Subtle filter breathing
-      if (this.filterNode) {
-        this.filterNode.frequency.linearRampToValueAtTime(
-          450 + Math.random() * 300,
-          noteTime + 1.5
-        )
-      }
-
-      // Schedule next random tranquil note (every 1.5s - 3.5s)
-      const nextDelay = 1600 + Math.random() * 2000
-      this.bgmIntervalId = setTimeout(triggerGenerativeNote, nextDelay)
+        osc.start(chordTime)
+        this.bgmOscillators.push({ osc, gain: voiceGain })
+      })
     }
 
-    // Start tranquil generator loop
-    triggerGenerativeNote()
+    // Play first chord immediately
+    playChordPads(chordProgressions[currentChordIdx])
 
-    // Smooth 1.8s crossfade in (no clicks)
+    // Morph chord every 8 seconds
+    this.chordIntervalId = setInterval(() => {
+      if (!this.isBgmActive) return
+      currentChordIdx = (currentChordIdx + 1) % chordProgressions.length
+      playChordPads(chordProgressions[currentChordIdx])
+    }, 8000)
+
+    // 3. Generative Crystalline Pentatonic Bell Chimes (Lusion signature sparkle)
+    const bellScale = [
+      261.63, // C4
+      293.66, // D4
+      329.63, // E4
+      392.0,  // G4
+      440.0,  // A4
+      523.25, // C5
+      587.33, // D5
+      659.25, // E5
+      783.99, // G5
+      880.0,  // A5
+      1046.5, // C6
+    ]
+
+    const triggerGenerativeChime = () => {
+      if (!this.isBgmActive || !ctx || !this.filterNode) return
+
+      const chimeTime = ctx.currentTime
+      const chimeFreq = bellScale[Math.floor(Math.random() * bellScale.length)]
+
+      const osc = ctx.createOscillator()
+      const chimeGain = ctx.createGain()
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(chimeFreq, chimeTime)
+
+      // Crystalline bell envelope: Fast attack (0.04s), long soothing decay (2.4s)
+      chimeGain.gain.setValueAtTime(0, chimeTime)
+      chimeGain.gain.linearRampToValueAtTime(0.16, chimeTime + 0.04)
+      chimeGain.gain.exponentialRampToValueAtTime(0.0001, chimeTime + 2.5)
+
+      if (panner) {
+        panner.pan.setValueAtTime((Math.random() - 0.5) * 0.9, chimeTime)
+        osc.connect(chimeGain)
+        chimeGain.connect(panner)
+        panner.connect(this.filterNode)
+        if (this.delayNode) {
+          panner.connect(this.delayNode)
+        }
+      } else {
+        osc.connect(chimeGain)
+        chimeGain.connect(this.filterNode)
+        if (this.delayNode) {
+          chimeGain.connect(this.delayNode)
+        }
+      }
+
+      osc.start(chimeTime)
+      osc.stop(chimeTime + 2.6)
+
+      // Schedule next soothing note (every 1.4s to 2.8s)
+      const nextDelay = 1400 + Math.random() * 1400
+      this.bgmIntervalId = setTimeout(triggerGenerativeChime, nextDelay)
+    }
+
+    // Trigger first chime right away
+    setTimeout(triggerGenerativeChime, 800)
+
+    // Smooth BGM Master Fade In
     this.bgmGain.gain.cancelScheduledValues(now)
     this.bgmGain.gain.setValueAtTime(0, now)
-    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 1.8)
+    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.8)
   }
 
   public stopBGM() {
@@ -208,151 +275,155 @@ class LusionAudioEngine {
       this.bgmIntervalId = null
     }
 
+    if (this.chordIntervalId) {
+      clearInterval(this.chordIntervalId)
+      this.chordIntervalId = null
+    }
+
     const now = this.ctx.currentTime
-    // Smooth 1.2s crossfade out
     this.bgmGain.gain.cancelScheduledValues(now)
-    this.bgmGain.gain.linearRampToValueAtTime(0, now + 1.2)
+    this.bgmGain.gain.linearRampToValueAtTime(0, now + 0.8)
 
     setTimeout(() => {
-      this.bgmOscillators.forEach((osc) => {
+      this.bgmOscillators.forEach(({ osc }) => {
         try {
           osc.stop()
           osc.disconnect()
         } catch {}
       })
       this.bgmOscillators = []
-    }, 1300)
+    }, 900)
   }
 
   // ============================================================================
   // TACTILE LUXURY SOUND EFFECTS (SFX)
   // ============================================================================
 
-  // Subtle acoustic hover tick (ultra-light)
+  // Subtle acoustic hover tick
   public playHover() {
-    this.init()
-    if (!this.ctx || !this.sfxGain) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
     try {
-      const now = this.ctx.currentTime
-      const osc = this.ctx.createOscillator()
-      const gain = this.ctx.createGain()
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
       osc.type = 'sine'
-      osc.frequency.setValueAtTime(1400, now)
-      osc.frequency.exponentialRampToValueAtTime(900, now + 0.018)
+      osc.frequency.setValueAtTime(1600, now)
+      osc.frequency.exponentialRampToValueAtTime(1000, now + 0.02)
 
-      gain.gain.setValueAtTime(0.015, now)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018)
+      gain.gain.setValueAtTime(0.06, now)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02)
 
       osc.connect(gain)
       gain.connect(this.sfxGain)
 
       osc.start(now)
-      osc.stop(now + 0.02)
+      osc.stop(now + 0.025)
     } catch {}
   }
 
-  // Tactile mechanical button click
+  // Tactile button click
   public playClick() {
-    this.init()
-    if (!this.ctx || !this.sfxGain) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
     try {
-      const now = this.ctx.currentTime
-      const osc = this.ctx.createOscillator()
-      const gain = this.ctx.createGain()
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
       osc.type = 'triangle'
-      osc.frequency.setValueAtTime(750, now)
-      osc.frequency.exponentialRampToValueAtTime(220, now + 0.04)
+      osc.frequency.setValueAtTime(820, now)
+      osc.frequency.exponentialRampToValueAtTime(260, now + 0.045)
 
-      gain.gain.setValueAtTime(0.045, now)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04)
+      gain.gain.setValueAtTime(0.18, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045)
 
       osc.connect(gain)
       gain.connect(this.sfxGain)
 
       osc.start(now)
-      osc.stop(now + 0.045)
+      osc.stop(now + 0.05)
     } catch {}
   }
 
-  // Uplifting chord chime (Success / Paid / Saved)
+  // Uplifting major chord chime (Success / Settled)
   public playSuccess() {
-    this.init()
-    if (!this.ctx || !this.sfxGain) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
     try {
-      const now = this.ctx.currentTime
-      // Harmonic major chord triad: C5, E5, G5
-      const freqs = [523.25, 659.25, 783.99]
+      const now = ctx.currentTime
+      // Harmonic major chord: C5 (523.25), E5 (659.25), G5 (783.99), C6 (1046.5)
+      const freqs = [523.25, 659.25, 783.99, 1046.5]
       freqs.forEach((freq, idx) => {
-        if (!this.ctx || !this.sfxGain) return
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
+        if (!ctx || !this.sfxGain) return
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
 
         osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now + idx * 0.035)
+        osc.frequency.setValueAtTime(freq, now + idx * 0.04)
 
-        gain.gain.setValueAtTime(0, now + idx * 0.035)
-        gain.gain.linearRampToValueAtTime(0.03, now + idx * 0.035 + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.035 + 0.35)
+        gain.gain.setValueAtTime(0, now + idx * 0.04)
+        gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.04 + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.04 + 0.45)
 
         osc.connect(gain)
         gain.connect(this.sfxGain)
 
-        osc.start(now + idx * 0.035)
-        osc.stop(now + idx * 0.035 + 0.38)
+        osc.start(now + idx * 0.04)
+        osc.stop(now + idx * 0.04 + 0.48)
       })
     } catch {}
   }
 
-  // Smooth mode toggle harmonic chime
+  // Harmonic mode switch chime
   public playChime(isDark: boolean = true) {
-    this.init()
-    if (!this.ctx || !this.sfxGain) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
     try {
-      const now = this.ctx.currentTime
-      const freqs = isDark ? [440, 659.25] : [659.25, 880]
+      const now = ctx.currentTime
+      const freqs = isDark ? [440, 659.25, 880] : [880, 659.25, 440]
       freqs.forEach((freq, idx) => {
-        if (!this.ctx || !this.sfxGain) return
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
+        if (!ctx || !this.sfxGain) return
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
 
         osc.type = 'sine'
         osc.frequency.setValueAtTime(freq, now + idx * 0.05)
 
-        gain.gain.setValueAtTime(0.03, now + idx * 0.05)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.05 + 0.22)
+        gain.gain.setValueAtTime(0.1, now + idx * 0.05)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.05 + 0.3)
 
         osc.connect(gain)
         gain.connect(this.sfxGain)
 
         osc.start(now + idx * 0.05)
-        osc.stop(now + idx * 0.05 + 0.24)
+        osc.stop(now + idx * 0.05 + 0.32)
       })
     } catch {}
   }
 
-  // Soft delete / remove tone
+  // Soft delete tone
   public playDelete() {
-    this.init()
-    if (!this.ctx || !this.sfxGain) return
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
     try {
-      const now = this.ctx.currentTime
-      const osc = this.ctx.createOscillator()
-      const gain = this.ctx.createGain()
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
       osc.type = 'sine'
-      osc.frequency.setValueAtTime(320, now)
-      osc.frequency.exponentialRampToValueAtTime(140, now + 0.08)
+      osc.frequency.setValueAtTime(360, now)
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.09)
 
-      gain.gain.setValueAtTime(0.03, now)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08)
+      gain.gain.setValueAtTime(0.12, now)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09)
 
       osc.connect(gain)
       gain.connect(this.sfxGain)
 
       osc.start(now)
-      osc.stop(now + 0.09)
+      osc.stop(now + 0.1)
     } catch {}
   }
 }
