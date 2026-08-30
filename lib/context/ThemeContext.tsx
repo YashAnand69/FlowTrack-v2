@@ -56,26 +56,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(transitionTimeoutRef.current)
     }
 
-    // Step 1: Trigger liquid portal shockwaves and 3D hologram
+    // Step 1: Start calm liquid ripple transition
     setTransitionState({
       isTransitioning: true,
       targetTheme: t,
     })
 
-    // Step 2: Swap the underlying DOM theme cleanly at peak shockwave expansion (240ms)
+    // Step 2: Swap the underlying DOM theme cleanly at peak ripple coverage (180ms)
     setTimeout(() => {
       setThemeState(t)
       applyThemeClass(t)
       localStorage.setItem('flowtrack_theme', t)
-    }, 240)
+    }, 180)
 
-    // Step 3: Dismiss fluid portal smoothly (850ms)
+    // Step 3: Dismiss calm ripple smoothly (620ms)
     transitionTimeoutRef.current = setTimeout(() => {
       setTransitionState({
         isTransitioning: false,
         targetTheme: null,
       })
-    }, 850)
+    }, 620)
   }
 
   const toggleTheme = () => {

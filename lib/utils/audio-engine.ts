@@ -403,9 +403,32 @@ class LusionAudioEngine {
     } catch {}
   }
 
-  // Harmonic mode switch chime
+  // Harmonic mode switch chime (Gentle acoustic glass drop)
   public playChime(isDark: boolean = true) {
-    this.playQuantumWarp(isDark)
+    const ctx = this.ensureContext()
+    if (!ctx || !this.sfxGain) return
+    try {
+      const now = ctx.currentTime
+      const freqs = isDark ? [523.25, 783.99] : [783.99, 1046.5]
+      freqs.forEach((freq, idx) => {
+        if (!ctx || !this.sfxGain) return
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, now + idx * 0.04)
+
+        gain.gain.setValueAtTime(0, now + idx * 0.04)
+        gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.04 + 0.015)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.04 + 0.28)
+
+        osc.connect(gain)
+        gain.connect(this.sfxGain)
+
+        osc.start(now + idx * 0.04)
+        osc.stop(now + idx * 0.04 + 0.3)
+      })
+    } catch {}
   }
 
   // Soft delete tone
