@@ -6,15 +6,15 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence, useReducedMotion, type Transition } from 'framer-motion'
 import {
   LayoutDashboard,
-  FileText,
+  Receipt,
   Users,
   Settings,
   ChevronLeft,
   ChevronRight,
   Plus,
-  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { soundEngine } from '@/lib/utils/haptics'
 
 interface SidebarProps {
   onOpenInvoiceModal?: () => void
@@ -28,54 +28,48 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
 
   const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Invoices', href: '/invoices', icon: FileText },
+    { label: 'Invoices', href: '/invoices', icon: Receipt },
     { label: 'Clients', href: '/clients', icon: Users },
     { label: 'Settings', href: '/settings', icon: Settings },
   ]
 
+  // Spring physics transition for fluid sliding pill
   const springTransition: Transition = shouldReduceMotion
-    ? { duration: 0 }
-    : { type: 'spring', stiffness: 380, damping: 30, mass: 0.8 }
-
-  const collapseSpring: Transition = shouldReduceMotion
-    ? { duration: 0 }
-    : { type: 'spring', stiffness: 320, damping: 32 }
+    ? { duration: 0.15 }
+    : {
+        type: 'spring',
+        stiffness: 420,
+        damping: 30,
+        mass: 0.8,
+      }
 
   return (
     <motion.aside
       initial={false}
-      animate={{ width: isCollapsed ? 76 : 256 }}
-      transition={collapseSpring}
-      className="hidden md:flex flex-col fixed top-0 left-0 h-screen z-30 bg-white/70 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200/80 dark:border-white/[0.08] text-zinc-900 dark:text-zinc-100 overflow-hidden shadow-[inset_-1px_0_0_rgba(0,0,0,0.03)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] select-none"
+      animate={{
+        width: isCollapsed ? 80 : 256,
+      }}
+      transition={springTransition}
+      className="hidden md:flex flex-col fixed inset-y-0 left-0 z-30 bg-white/75 dark:bg-[#09090b]/80 backdrop-blur-2xl border-r border-zinc-200/80 dark:border-white/[0.08] select-none transition-colors duration-200 shadow-[1px_0_0_rgba(0,0,0,0.03)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)]"
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-200/60 dark:border-white/[0.06] relative z-10">
-        <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden group">
-          <motion.div
-            whileHover={{ scale: 1.06, rotate: -2 }}
-            whileTap={{ scale: 0.94 }}
-            transition={springTransition}
-            className="w-9 h-9 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center shrink-0 shadow-[0_2px_10px_rgba(0,0,0,0.15)] dark:shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-          >
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </motion.div>
+      <div className="h-16 flex items-center justify-between px-5 border-b border-zinc-200/80 dark:border-white/[0.08] relative z-10">
+        <Link
+          href="/dashboard"
+          onClick={() => soundEngine.playClick()}
+          className="flex items-center gap-3 overflow-hidden group cursor-pointer"
+        >
+          {/* Stark Monogram Mark */}
+          <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-200">
+            FT
+          </div>
 
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {!isCollapsed && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                exit={{ opacity: 0, x: -6 }}
                 transition={{ duration: 0.15 }}
                 className="flex flex-col whitespace-nowrap"
               >
@@ -93,7 +87,10 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
         <motion.button
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => {
+            soundEngine.playClick()
+            setIsCollapsed(!isCollapsed)
+          }}
           className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors relative z-10 cursor-pointer"
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -109,7 +106,10 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
             whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
             whileTap={shouldReduceMotion ? {} : { scale: 0.97 }}
             transition={springTransition}
-            onClick={onOpenInvoiceModal}
+            onClick={() => {
+              soundEngine.playClick()
+              onOpenInvoiceModal()
+            }}
             className={cn(
               'w-full flex items-center justify-center font-semibold rounded-xl bg-zinc-950 text-white hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_2px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_0_24px_rgba(255,255,255,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors cursor-pointer',
               isCollapsed ? 'h-10 p-0' : 'h-10 px-4 gap-2 text-xs tracking-tight'
@@ -125,6 +125,7 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
               whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
               whileTap={shouldReduceMotion ? {} : { scale: 0.97 }}
               transition={springTransition}
+              onClick={() => soundEngine.playClick()}
               className={cn(
                 'w-full flex items-center justify-center font-semibold rounded-xl bg-zinc-950 text-white hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_2px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_0_24px_rgba(255,255,255,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors cursor-pointer',
                 isCollapsed ? 'h-10 p-0' : 'h-10 px-4 gap-2 text-xs tracking-tight'
@@ -153,7 +154,11 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              onMouseEnter={() => setHoveredItem(item.href)}
+              onClick={() => soundEngine.playClick()}
+              onMouseEnter={() => {
+                soundEngine.playHover()
+                setHoveredItem(item.href)
+              }}
               className={cn(
                 'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-colors duration-150 relative group select-none',
                 isActive
@@ -198,46 +203,46 @@ export function Sidebar({ onOpenInvoiceModal }: SidebarProps) {
                 />
               </motion.div>
 
-              {/* Nav Item Label */}
-              {!isCollapsed && (
-                <span className="relative z-10 whitespace-nowrap font-medium text-xs">
-                  {item.label}
-                </span>
-              )}
-
-              {/* Active Right Micro Dot */}
-              {isActive && !isCollapsed && (
-                <motion.div
-                  layoutId="activeNavDot"
-                  transition={springTransition}
-                  className="ml-auto relative z-10 w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                />
-              )}
+              {/* Label */}
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="relative z-10 font-mono tracking-tight"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </Link>
           )
         })}
       </nav>
 
-      {/* Fluid Monochrome Pro Badge */}
-      <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 15 }}
-            transition={{ duration: 0.2 }}
-            className="p-3.5 m-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl relative z-10"
-          >
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-900 dark:text-white">
-              <Sparkles className="w-3.5 h-3.5 text-zinc-950 dark:text-white" />
-              <span>Fluid Architecture</span>
+      {/* Footer Pro Status Indicator */}
+      <div className="p-3.5 border-t border-zinc-200/80 dark:border-white/[0.08] relative z-10">
+        <div
+          className={cn(
+            'flex items-center gap-2.5 p-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06]',
+            isCollapsed && 'justify-center p-2'
+          )}
+        >
+          <div className="w-2 h-2 rounded-full bg-zinc-950 dark:bg-white animate-pulse shrink-0 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+          {!isCollapsed && (
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-zinc-950 dark:text-white font-mono tracking-tight">
+                Studio Engine
+              </span>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Real-time Sync
+              </span>
             </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed font-normal">
-              Bespoke spring dynamics and responsive fluid field.
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
+      </div>
     </motion.aside>
   )
 }

@@ -14,9 +14,12 @@ import {
   Building2,
   Flame,
   Command,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeContext'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useAudio } from '@/lib/context/AudioContext'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 import { soundEngine } from '@/lib/utils/haptics'
@@ -36,6 +39,7 @@ export function TopBar({
 }: TopBarProps) {
   const { theme, toggleTheme } = useTheme()
   const { user, profile, signOut } = useAuth()
+  const { isBgmPlaying, toggleBgm } = useAudio()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -87,7 +91,49 @@ export function TopBar({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
+      <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+        {/* Ambient Soundscape BGM Toggle Button with Animated Equalizer */}
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => {
+            soundEngine.playClick()
+            toggleBgm()
+          }}
+          className={`flex items-center gap-2 px-2.5 py-1.5 text-xs font-mono font-medium rounded-xl border transition-all cursor-pointer ${
+            isBgmPlaying
+              ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 border-zinc-950 dark:border-white shadow-xs'
+              : 'bg-black/[0.02] dark:bg-white/[0.03] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border-zinc-200/80 dark:border-white/[0.08]'
+          }`}
+          title={isBgmPlaying ? 'Pause Ambient Soundscape' : 'Play Soothing Ambient Soundscape'}
+          aria-label={isBgmPlaying ? 'Pause Ambient Soundscape' : 'Play Soothing Ambient Soundscape'}
+        >
+          {isBgmPlaying ? (
+            <div className="flex items-end gap-[2px] h-3.5 w-3.5 py-0.5">
+              <motion.span
+                animate={{ height: ['30%', '100%', '50%', '80%', '30%'] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-[2px] rounded-full bg-current"
+              />
+              <motion.span
+                animate={{ height: ['80%', '30%', '100%', '40%', '80%'] }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-[2px] rounded-full bg-current"
+              />
+              <motion.span
+                animate={{ height: ['40%', '90%', '20%', '100%', '40%'] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-[2px] rounded-full bg-current"
+              />
+            </div>
+          ) : (
+            <VolumeX className="w-3.5 h-3.5 opacity-70" />
+          )}
+          <span className="text-[11px] hidden md:inline font-mono tracking-tight">
+            {isBgmPlaying ? 'Soundscape On' : 'Ambience'}
+          </span>
+        </motion.button>
+
         {/* Quick Command Palette Button for Mobile */}
         {onOpenCommandPalette && (
           <button
@@ -134,7 +180,7 @@ export function TopBar({
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
           onClick={() => {
-            soundEngine.playChime()
+            soundEngine.playChime(theme === 'dark')
             toggleTheme()
           }}
           className="p-2 rounded-xl text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] border border-transparent hover:border-black/5 dark:hover:border-white/10 transition-colors cursor-pointer"

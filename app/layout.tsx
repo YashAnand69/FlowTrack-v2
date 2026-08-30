@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/lib/context/ThemeContext'
 import { ToastProvider } from '@/lib/context/ToastContext'
 import { AuthProvider } from '@/lib/context/AuthContext'
+import { AudioProvider } from '@/lib/context/AudioContext'
 import { FluidDynamicsCanvas } from '@/components/ui/FluidDynamicsCanvas'
 import { FluidCursor } from '@/components/ui/FluidCursor'
 
@@ -28,18 +29,20 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-[#fbfbfb] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 antialiased selection:bg-zinc-950 selection:text-white dark:selection:bg-white dark:selection:text-zinc-950 relative overflow-x-hidden">
         <ThemeProvider>
-          <ToastProvider>
-            <AuthProvider>
-              {/* Interactive Hydrodynamic Fluid Canvas */}
-              <FluidDynamicsCanvas />
+          <AudioProvider>
+            <ToastProvider>
+              <AuthProvider>
+                {/* Interactive Hydrodynamic Fluid Canvas */}
+                <FluidDynamicsCanvas />
 
-              {/* Lusion-style Liquid Magnetic Cursor Follower */}
-              <FluidCursor />
+                {/* Lusion-style Liquid Magnetic Cursor Follower */}
+                <FluidCursor />
 
-              {/* Main App Content */}
-              <div className="relative z-10">{children}</div>
-            </AuthProvider>
-          </ToastProvider>
+                {/* Main App Content */}
+                <div className="relative z-10">{children}</div>
+              </AuthProvider>
+            </ToastProvider>
+          </AudioProvider>
         </ThemeProvider>
       </body>
     </html>

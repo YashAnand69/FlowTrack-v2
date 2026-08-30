@@ -12,6 +12,9 @@ import {
   Percent,
   Database,
   Flame,
+  Volume2,
+  VolumeX,
+  Music,
 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -19,14 +22,17 @@ import { Button } from '@/components/ui/Button'
 import { CURRENCY_SYMBOLS } from '@/lib/utils/formatters'
 import { useAuth } from '@/lib/context/AuthContext'
 import { useTheme } from '@/lib/context/ThemeContext'
+import { useAudio } from '@/lib/context/AudioContext'
 import { useToast } from '@/lib/context/ToastContext'
 import { dbService } from '@/lib/supabase/db-service'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
+import { soundEngine } from '@/lib/utils/haptics'
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { isBgmPlaying, toggleBgm } = useAudio()
   const { success, error: toastError } = useToast()
   const shouldReduceMotion = useReducedMotion()
 
@@ -61,6 +67,7 @@ export default function SettingsPage() {
     const reader = new FileReader()
     reader.onload = () => {
       setLogoPreview(reader.result as string)
+      soundEngine.playSuccess()
       success('Logo loaded', 'Click Save Changes to persist your new logo.')
     }
     reader.readAsDataURL(file)
@@ -82,6 +89,7 @@ export default function SettingsPage() {
         user?.id
       )
       await refreshProfile()
+      soundEngine.playSuccess()
       window.dispatchEvent(new CustomEvent('flowtrack_data_updated'))
       success('Preferences Persisted', 'Your studio identity and settings were updated.')
     } catch (err: any) {
@@ -93,6 +101,7 @@ export default function SettingsPage() {
 
   const handleResetDemo = () => {
     if (confirm('Reset ledger demo data back to default state?')) {
+      soundEngine.playClick()
       dbService.resetDemoData()
       refreshProfile()
       window.dispatchEvent(new CustomEvent('flowtrack_data_updated'))
@@ -129,7 +138,7 @@ export default function SettingsPage() {
           Studio Preferences
         </h1>
         <p className="text-xs text-zinc-400 mt-1 font-mono">
-          Configure branding identity, multi-currency ledger rules, and appearance
+          Configure branding identity, multi-currency ledger rules, and acoustic environment
         </p>
       </div>
 
@@ -243,23 +252,27 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Section 3: Appearance & Theme */}
-        <div className="glass-card rounded-2xl p-6 space-y-4">
+        {/* Section 3: Appearance & Acoustic Ambience */}
+        <div className="glass-card rounded-2xl p-6 space-y-6">
           <div className="border-b border-zinc-100 dark:border-white/[0.06] pb-4">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-950 dark:text-white">
-              Visual Environment
+              Visual & Acoustic Atmosphere
             </h2>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Select your monochrome interface mode (persisted to browser storage).
+              Customize your monochrome interface mode and soothing ambient soundscape.
             </p>
           </div>
 
+          {/* Theme Selector */}
           <div className="grid grid-cols-2 gap-4">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={() => setTheme('light')}
+              onClick={() => {
+                soundEngine.playChime(false)
+                setTheme('light')
+              }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'light'
                   ? 'border-zinc-950 dark:border-white bg-black/[0.04] dark:bg-white/[0.08] ring-1 ring-zinc-950 dark:ring-white shadow-xs'
@@ -280,7 +293,10 @@ export default function SettingsPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={() => setTheme('dark')}
+              onClick={() => {
+                soundEngine.playChime(true)
+                setTheme('dark')
+              }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'dark'
                   ? 'border-zinc-950 dark:border-white bg-black/[0.04] dark:bg-white/[0.08] ring-1 ring-zinc-950 dark:ring-white shadow-xs'
@@ -296,6 +312,33 @@ export default function SettingsPage() {
                 <p className="text-[11px] text-zinc-400">Deep charcoal #09090b</p>
               </div>
             </motion.button>
+          </div>
+
+          {/* Ambient BGM Soundscape Card */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-zinc-200/60 dark:border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-black/[0.05] dark:bg-white/[0.08] text-zinc-950 dark:text-white flex items-center justify-center">
+                <Music className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold font-mono text-zinc-950 dark:text-white">
+                  Lusion-Inspired Ambient Soundscape
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  Comforting generative drone & soothing crystalline harmonic chimes.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant={isBgmPlaying ? 'primary' : 'outline'}
+              size="sm"
+              onClick={toggleBgm}
+              leftIcon={isBgmPlaying ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            >
+              {isBgmPlaying ? 'Soundscape Active' : 'Start Ambience'}
+            </Button>
           </div>
         </div>
 

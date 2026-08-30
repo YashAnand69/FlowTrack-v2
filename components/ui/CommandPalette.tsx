@@ -16,9 +16,12 @@ import {
   ArrowRight,
   Download,
   Command,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeContext'
 import { useToast } from '@/lib/context/ToastContext'
+import { useAudio } from '@/lib/context/AudioContext'
 import { dbService } from '@/lib/supabase/db-service'
 import { soundEngine } from '@/lib/utils/haptics'
 
@@ -26,7 +29,7 @@ interface CommandItem {
   id: string
   title: string
   subtitle?: string
-  category: 'Navigation' | 'Actions' | 'Theme & Ledger'
+  category: 'Navigation' | 'Actions' | 'Theme & Ambience'
   icon: React.ReactNode
   perform: () => void
 }
@@ -46,6 +49,7 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const router = useRouter()
   const { theme, toggleTheme } = useTheme()
+  const { isBgmPlaying, toggleBgm } = useAudio()
   const { success } = useToast()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -137,12 +141,26 @@ export function CommandPalette({
       },
     },
 
-    // Theme & Ledger
+    // Theme & Ambience
+    {
+      id: 'act-toggle-bgm',
+      title: isBgmPlaying ? 'Pause Ambient Soundscape' : 'Play Soothing Ambient Soundscape',
+      subtitle: 'Tranquil Lusion-grade generative meditation drone and chimes',
+      category: 'Theme & Ambience',
+      icon: isBgmPlaying ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />,
+      perform: () => {
+        toggleBgm()
+        success(
+          isBgmPlaying ? 'Soundscape Paused' : 'Soundscape Playing',
+          isBgmPlaying ? 'Ambient audio muted.' : 'Playing soothing generative background music.'
+        )
+      },
+    },
     {
       id: 'thm-toggle',
       title: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       subtitle: 'Toggle monochrome visual canvas',
-      category: 'Theme & Ledger',
+      category: 'Theme & Ambience',
       icon: theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />,
       perform: () => toggleTheme(),
     },
@@ -150,7 +168,7 @@ export function CommandPalette({
       id: 'act-reset-demo',
       title: 'Reset Ledger Demo Data',
       subtitle: 'Restore fresh sample clients and invoice records',
-      category: 'Theme & Ledger',
+      category: 'Theme & Ambience',
       icon: <RotateCcw className="w-4 h-4" />,
       perform: () => {
         dbService.resetDemoData()
