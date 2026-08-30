@@ -16,6 +16,7 @@ interface AmbientFluidBlob {
   phaseX: number
   phaseY: number
   alpha: number
+  harmonics: number[]
 }
 
 interface SmokePuff {
@@ -28,6 +29,15 @@ interface SmokePuff {
   life: number
   maxLife: number
   alpha: number
+}
+
+interface LiquidTrailPoint {
+  x: number
+  y: number
+  age: number
+  vx: number
+  vy: number
+  radius: number
 }
 
 export function FluidDynamicsCanvas() {
@@ -66,39 +76,88 @@ export function FluidDynamicsCanvas() {
 
     const isDark = theme === 'dark'
 
-    // 1. Organic Ambient Liquid Light Orbs (Lusion background glow)
-    const blobCount = 5
-    const blobs: AmbientFluidBlob[] = []
-
-    const seedPositions = [
-      { x: 0.2, y: 0.25, r: 380 },
-      { x: 0.8, y: 0.2, r: 420 },
-      { x: 0.5, y: 0.55, r: 480 },
-      { x: 0.15, y: 0.8, r: 360 },
-      { x: 0.85, y: 0.75, r: 400 },
-    ]
-
-    seedPositions.forEach((pos, idx) => {
-      const x = width * pos.x
-      const y = height * pos.y
-      blobs.push({
-        x,
-        y,
-        originX: x,
-        originY: y,
+    // 1. Organic Ambient Volumetric Liquid Blobs (Noticeable, elegant Lusion glow)
+    const blobs: AmbientFluidBlob[] = [
+      {
+        x: width * 0.25,
+        y: height * 0.25,
+        originX: width * 0.25,
+        originY: height * 0.25,
         vx: 0,
         vy: 0,
-        radius: pos.r,
-        baseRadius: pos.r,
-        speed: 0.0006 + idx * 0.0002,
-        phaseX: idx * 1.5,
-        phaseY: idx * 2.1 + 1.0,
-        alpha: isDark ? 0.065 + (idx % 2 === 0 ? 0.02 : 0) : 0.045 + (idx % 2 === 0 ? 0.015 : 0),
-      })
-    })
+        radius: 440,
+        baseRadius: 440,
+        speed: 0.0008,
+        phaseX: 0,
+        phaseY: 1.2,
+        alpha: isDark ? 0.16 : 0.09,
+        harmonics: [3, 5, 2],
+      },
+      {
+        x: width * 0.78,
+        y: height * 0.22,
+        originX: width * 0.78,
+        originY: height * 0.22,
+        vx: 0,
+        vy: 0,
+        radius: 480,
+        baseRadius: 480,
+        speed: 0.0006,
+        phaseX: 2.4,
+        phaseY: 3.1,
+        alpha: isDark ? 0.18 : 0.10,
+        harmonics: [4, 6, 3],
+      },
+      {
+        x: width * 0.5,
+        y: height * 0.58,
+        originX: width * 0.5,
+        originY: height * 0.58,
+        vx: 0,
+        vy: 0,
+        radius: 520,
+        baseRadius: 520,
+        speed: 0.0007,
+        phaseX: 4.2,
+        phaseY: 0.8,
+        alpha: isDark ? 0.15 : 0.085,
+        harmonics: [3, 7, 4],
+      },
+      {
+        x: width * 0.18,
+        y: height * 0.82,
+        originX: width * 0.18,
+        originY: height * 0.82,
+        vx: 0,
+        vy: 0,
+        radius: 420,
+        baseRadius: 420,
+        speed: 0.0009,
+        phaseX: 1.8,
+        phaseY: 4.5,
+        alpha: isDark ? 0.16 : 0.09,
+        harmonics: [5, 3, 2],
+      },
+      {
+        x: width * 0.85,
+        y: height * 0.78,
+        originX: width * 0.85,
+        originY: height * 0.78,
+        vx: 0,
+        vy: 0,
+        radius: 460,
+        baseRadius: 460,
+        speed: 0.0007,
+        phaseX: 3.5,
+        phaseY: 2.2,
+        alpha: isDark ? 0.17 : 0.095,
+        harmonics: [4, 5, 3],
+      },
+    ]
 
-    // 2. Silky Smoke Puffs emitted smoothly by mouse motion
+    // 2. Fluid Smoke Puffs & Liquid Ribbons
     const smokePuffs: SmokePuff[] = []
+    const liquidTrail: LiquidTrailPoint[] = []
 
     const handleResize = () => {
       if (!canvas) return
@@ -112,7 +171,14 @@ export function FluidDynamicsCanvas() {
       canvas.style.height = `${height}px`
       ctx.scale(dpr, dpr)
 
-      seedPositions.forEach((pos, idx) => {
+      const positions = [
+        { x: 0.25, y: 0.25 },
+        { x: 0.78, y: 0.22 },
+        { x: 0.5, y: 0.58 },
+        { x: 0.18, y: 0.82 },
+        { x: 0.85, y: 0.78 },
+      ]
+      positions.forEach((pos, idx) => {
         if (blobs[idx]) {
           blobs[idx].originX = width * pos.x
           blobs[idx].originY = height * pos.y
@@ -138,27 +204,42 @@ export function FluidDynamicsCanvas() {
       const dy = currentY - mouse.lastY
       const dist = Math.sqrt(dx * dx + dy * dy)
 
-      mouse.vx = dx * 0.5
-      mouse.vy = dy * 0.5
+      mouse.vx = dx * 0.6
+      mouse.vy = dy * 0.6
       mouse.speed = dist
       mouse.x = currentX
       mouse.y = currentY
       mouse.active = true
 
-      // Emit smooth, soft ethereal smoke puffs as mouse travels
+      // Add to continuous liquid ribbon trail
+      if (dist > 2) {
+        liquidTrail.push({
+          x: currentX,
+          y: currentY,
+          age: 0,
+          vx: dx * 0.1,
+          vy: dy * 0.1,
+          radius: Math.min(35 + dist * 1.2, 90),
+        })
+        if (liquidTrail.length > 28) {
+          liquidTrail.shift()
+        }
+      }
+
+      // Emit soft volumetric liquid vapor puff
       const now = performance.now()
-      if (dist > 3 && now - lastEmitTime > 30 && smokePuffs.length < 35) {
+      if (dist > 4 && now - lastEmitTime > 25 && smokePuffs.length < 35) {
         lastEmitTime = now
         smokePuffs.push({
           x: currentX,
           y: currentY,
-          vx: dx * 0.15 + (Math.random() - 0.5) * 0.8,
-          vy: dy * 0.15 + (Math.random() - 0.5) * 0.8,
-          radius: Math.min(60 + dist * 1.5, 140),
-          maxRadius: Math.min(130 + dist * 2.5, 260),
+          vx: dx * 0.18 + (Math.random() - 0.5) * 0.9,
+          vy: dy * 0.18 + (Math.random() - 0.5) * 0.9,
+          radius: Math.min(70 + dist * 1.8, 160),
+          maxRadius: Math.min(160 + dist * 3.0, 320),
           life: 0,
-          maxLife: 65 + Math.random() * 25,
-          alpha: isDark ? Math.min(0.09 + dist * 0.002, 0.18) : Math.min(0.06 + dist * 0.0015, 0.12),
+          maxLife: 60 + Math.random() * 25,
+          alpha: isDark ? Math.min(0.18 + dist * 0.003, 0.28) : Math.min(0.11 + dist * 0.002, 0.18),
         })
       }
 
@@ -168,17 +249,17 @@ export function FluidDynamicsCanvas() {
 
     const handlePointerDown = (e: PointerEvent | MouseEvent) => {
       mouseRef.current.down = true
-      // Soft ambient pressure pulse on click
+      // Noticeable organic ripple on click
       smokePuffs.push({
         x: e.clientX,
         y: e.clientY,
         vx: 0,
         vy: 0,
-        radius: 80,
-        maxRadius: 320,
+        radius: 90,
+        maxRadius: 360,
         life: 0,
-        maxLife: 75,
-        alpha: isDark ? 0.22 : 0.15,
+        maxLife: 70,
+        alpha: isDark ? 0.35 : 0.22,
       })
     }
 
@@ -194,79 +275,79 @@ export function FluidDynamicsCanvas() {
     window.addEventListener('pointermove', handlePointerMove, { passive: true })
     window.addEventListener('pointerdown', handlePointerDown)
     window.addEventListener('pointerup', handlePointerUp)
-    document.addEventListener('pointerleave', handlePointerLeave)
+    document.addEventListener('mouseleave', handlePointerLeave)
 
     let time = 0
 
-    // Master 60FPS Fluid Render Loop
+    // Master 60FPS Fluid Dynamics Render Loop
     const render = () => {
-      time += 0.012
+      time += 0.014
       ctx.clearRect(0, 0, width, height)
 
       const mouse = mouseRef.current
 
-      // Butter-smooth spring interpolation for cursor spotlight
+      // Spring-damped smooth cursor spotlight
       if (mouse.active) {
-        mouse.smoothX += (mouse.x - mouse.smoothX) * 0.085
-        mouse.smoothY += (mouse.y - mouse.smoothY) * 0.085
+        mouse.smoothX += (mouse.x - mouse.smoothX) * 0.09
+        mouse.smoothY += (mouse.y - mouse.smoothY) * 0.09
       }
       mouse.vx *= 0.92
       mouse.vy *= 0.92
       mouse.speed *= 0.92
 
       // ======================================================================
-      // 1. ORGANIC LIQUID AMBIENT LIGHT BLOBS (Calm, floating, deep Lusion glow)
+      // 1. ORGANIC AMBIENT VOLUMETRIC LIQUID LIGHT BLOBS (Noticeable, soft glow)
       // ======================================================================
       for (let i = 0; i < blobs.length; i++) {
         const b = blobs[i]
 
-        // Smooth multi-frequency harmonic drift
+        // Smooth multi-frequency organic drift
         const targetX =
           b.originX +
-          Math.sin(time * 0.8 + b.phaseX) * 90 +
-          Math.cos(time * 0.4 + b.phaseY) * 45
+          Math.sin(time * 0.9 + b.phaseX) * 110 +
+          Math.cos(time * 0.45 + b.phaseY) * 55
         const targetY =
           b.originY +
-          Math.cos(time * 0.7 + b.phaseY) * 75 +
-          Math.sin(time * 0.5 + b.phaseX) * 40
+          Math.cos(time * 0.8 + b.phaseY) * 90 +
+          Math.sin(time * 0.55 + b.phaseX) * 50
 
-        // Gentle liquid repulsion / attraction from cursor
+        // Responsive liquid fluid interaction from cursor
         if (mouse.active) {
           const dx = b.x - mouse.smoothX
           const dy = b.y - mouse.smoothY
           const dist = Math.sqrt(dx * dx + dy * dy)
-          const influence = 350
+          const influence = 400
 
           if (dist < influence && dist > 1) {
-            const factor = Math.pow(1 - dist / influence, 2) * (mouse.down ? 45 : 25)
+            const factor = Math.pow(1 - dist / influence, 2) * (mouse.down ? 55 : 32)
             const angle = Math.atan2(dy, dx)
-            b.vx += Math.cos(angle) * factor * 0.08
-            b.vy += Math.sin(angle) * factor * 0.08
+            b.vx += Math.cos(angle) * factor * 0.09
+            b.vy += Math.sin(angle) * factor * 0.09
           }
         }
 
-        // Damped viscous restoration
-        b.vx = (b.vx + (targetX - b.x) * 0.02) * 0.9
-        b.vy = (b.vy + (targetY - b.y) * 0.02) * 0.9
+        // Viscous damping restoration
+        b.vx = (b.vx + (targetX - b.x) * 0.022) * 0.89
+        b.vy = (b.vy + (targetY - b.y) * 0.022) * 0.89
 
         b.x += b.vx
         b.y += b.vy
 
         // Breathing radius modulation
         const currentRadius =
-          b.baseRadius + Math.sin(time * 1.2 + b.phaseX) * 35
+          b.baseRadius + Math.sin(time * 1.4 + b.phaseX) * 45
 
         // Render soft Gaussian liquid glow orb
         const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, currentRadius)
         if (isDark) {
-          grad.addColorStop(0, `rgba(255, 255, 255, ${b.alpha * 1.3})`)
-          grad.addColorStop(0.35, `rgba(255, 255, 255, ${b.alpha * 0.7})`)
-          grad.addColorStop(0.7, `rgba(255, 255, 255, ${b.alpha * 0.2})`)
+          grad.addColorStop(0, `rgba(255, 255, 255, ${b.alpha * 1.4})`)
+          grad.addColorStop(0.3, `rgba(255, 255, 255, ${b.alpha * 0.75})`)
+          grad.addColorStop(0.65, `rgba(255, 255, 255, ${b.alpha * 0.22})`)
           grad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          grad.addColorStop(0, `rgba(0, 0, 0, ${b.alpha * 1.1})`)
-          grad.addColorStop(0.35, `rgba(0, 0, 0, ${b.alpha * 0.6})`)
-          grad.addColorStop(0.7, `rgba(0, 0, 0, ${b.alpha * 0.15})`)
+          grad.addColorStop(0, `rgba(0, 0, 0, ${b.alpha * 1.2})`)
+          grad.addColorStop(0.3, `rgba(0, 0, 0, ${b.alpha * 0.65})`)
+          grad.addColorStop(0.65, `rgba(0, 0, 0, ${b.alpha * 0.18})`)
           grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
@@ -277,7 +358,45 @@ export function FluidDynamicsCanvas() {
       }
 
       // ======================================================================
-      // 2. SILKY SMOOTH LIQUID SMOKE PUFFS (Dissipates like silk in water)
+      // 2. FLUID VELOCITY WAKE TRAIL (Continuous fluid ribbon behind cursor)
+      // ======================================================================
+      for (let t = liquidTrail.length - 1; t >= 0; t--) {
+        const pt = liquidTrail[t]
+        pt.age++
+        pt.x += pt.vx
+        pt.y += pt.vy
+        pt.vx *= 0.94
+        pt.vy *= 0.94
+
+        const maxAge = 25
+        const ageProgress = pt.age / maxAge
+        if (ageProgress >= 1) {
+          liquidTrail.splice(t, 1)
+          continue
+        }
+
+        const trailRadius = pt.radius * (1 + ageProgress * 0.6)
+        const trailAlpha = (1 - ageProgress) * (isDark ? 0.14 : 0.08)
+
+        const trailGrad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, trailRadius)
+        if (isDark) {
+          trailGrad.addColorStop(0, `rgba(255, 255, 255, ${trailAlpha})`)
+          trailGrad.addColorStop(0.5, `rgba(255, 255, 255, ${trailAlpha * 0.4})`)
+          trailGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+        } else {
+          trailGrad.addColorStop(0, `rgba(0, 0, 0, ${trailAlpha})`)
+          trailGrad.addColorStop(0.5, `rgba(0, 0, 0, ${trailAlpha * 0.4})`)
+          trailGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        }
+
+        ctx.fillStyle = trailGrad
+        ctx.beginPath()
+        ctx.arc(pt.x, pt.y, trailRadius, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // ======================================================================
+      // 3. SILKY LIQUID SMOKE PUFFS (Dissipating vapor ripples)
       // ======================================================================
       for (let s = smokePuffs.length - 1; s >= 0; s--) {
         const p = smokePuffs[s]
@@ -285,13 +404,12 @@ export function FluidDynamicsCanvas() {
 
         p.x += p.vx
         p.y += p.vy
-        p.vx *= 0.94
-        p.vy *= 0.94
+        p.vx *= 0.95
+        p.vy *= 0.95
 
         const progress = p.life / p.maxLife
-        // Smooth cubic ease-out expansion & soft fade
         const currentRadius = p.radius + (p.maxRadius - p.radius) * Math.sin((progress * Math.PI) / 2)
-        const currentAlpha = p.alpha * Math.pow(1 - progress, 1.8)
+        const currentAlpha = p.alpha * Math.pow(1 - progress, 1.7)
 
         if (progress >= 1 || currentAlpha <= 0.002) {
           smokePuffs.splice(s, 1)
@@ -300,14 +418,14 @@ export function FluidDynamicsCanvas() {
 
         const smokeGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentRadius)
         if (isDark) {
-          smokeGrad.addColorStop(0, `rgba(255, 255, 255, ${currentAlpha * 0.9})`)
-          smokeGrad.addColorStop(0.4, `rgba(255, 255, 255, ${currentAlpha * 0.45})`)
-          smokeGrad.addColorStop(0.8, `rgba(255, 255, 255, ${currentAlpha * 0.1})`)
+          smokeGrad.addColorStop(0, `rgba(255, 255, 255, ${currentAlpha})`)
+          smokeGrad.addColorStop(0.35, `rgba(255, 255, 255, ${currentAlpha * 0.5})`)
+          smokeGrad.addColorStop(0.75, `rgba(255, 255, 255, ${currentAlpha * 0.12})`)
           smokeGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          smokeGrad.addColorStop(0, `rgba(0, 0, 0, ${currentAlpha * 0.85})`)
-          smokeGrad.addColorStop(0.4, `rgba(0, 0, 0, ${currentAlpha * 0.4})`)
-          smokeGrad.addColorStop(0.8, `rgba(0, 0, 0, ${currentAlpha * 0.08})`)
+          smokeGrad.addColorStop(0, `rgba(0, 0, 0, ${currentAlpha * 0.9})`)
+          smokeGrad.addColorStop(0.35, `rgba(0, 0, 0, ${currentAlpha * 0.45})`)
+          smokeGrad.addColorStop(0.75, `rgba(0, 0, 0, ${currentAlpha * 0.1})`)
           smokeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
@@ -318,10 +436,10 @@ export function FluidDynamicsCanvas() {
       }
 
       // ======================================================================
-      // 3. BUTTERY VISCOUS LIQUID CURSOR SPOTLIGHT (Lusion signature glow)
+      // 4. VISCOUS LIQUID CURSOR SPOTLIGHT
       // ======================================================================
       if (mouse.active && mouse.smoothX > 0) {
-        const spotRadius = 240 + Math.min(mouse.speed * 2.0, 100)
+        const spotRadius = 260 + Math.min(mouse.speed * 2.2, 120)
         const spotGrad = ctx.createRadialGradient(
           mouse.smoothX,
           mouse.smoothY,
@@ -332,14 +450,14 @@ export function FluidDynamicsCanvas() {
         )
 
         if (isDark) {
-          spotGrad.addColorStop(0, 'rgba(255, 255, 255, 0.075)')
-          spotGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.035)')
-          spotGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.008)')
+          spotGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)')
+          spotGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.055)')
+          spotGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.012)')
           spotGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          spotGrad.addColorStop(0, 'rgba(0, 0, 0, 0.055)')
-          spotGrad.addColorStop(0.3, 'rgba(0, 0, 0, 0.025)')
-          spotGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.006)')
+          spotGrad.addColorStop(0, 'rgba(0, 0, 0, 0.085)')
+          spotGrad.addColorStop(0.3, 'rgba(0, 0, 0, 0.038)')
+          spotGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.008)')
           spotGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
