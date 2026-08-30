@@ -7,6 +7,7 @@ import { AuthProvider } from '@/lib/context/AuthContext'
 import { AudioProvider } from '@/lib/context/AudioContext'
 import { FluidDynamicsCanvas } from '@/components/ui/FluidDynamicsCanvas'
 import { FluidCursor } from '@/components/ui/FluidCursor'
+import { ThemeTransitionOverlay } from '@/components/ui/ThemeTransitionOverlay'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -32,6 +33,9 @@ export default function RootLayout({
           <AudioProvider>
             <ToastProvider>
               <AuthProvider>
+                {/* Fullscreen Liquid Theme Transition Screen */}
+                <ThemeTransitionOverlay />
+
                 {/* Interactive Hydrodynamic Fluid Canvas */}
                 <FluidDynamicsCanvas />
 

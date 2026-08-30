@@ -175,13 +175,13 @@ export function TopBar({
           </motion.button>
         )}
 
-        {/* Theme Toggle Button with Haptic Sound */}
+        {/* Theme Toggle Button with Haptic Sound and Liquid Wipe Event Tracking */}
         <motion.button
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
-          onClick={() => {
-            soundEngine.playChime(theme === 'dark')
-            toggleTheme()
+          onClick={(e) => {
+            soundEngine.playChime(theme === 'light')
+            toggleTheme(e)
           }}
           className="p-2 rounded-xl text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] border border-transparent hover:border-black/5 dark:hover:border-white/10 transition-colors cursor-pointer"
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

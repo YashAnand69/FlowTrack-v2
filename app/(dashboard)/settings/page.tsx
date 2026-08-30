@@ -263,15 +263,15 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Theme Selector */}
+          {/* Theme Selector with Liquid Radial Wipe */}
           <div className="grid grid-cols-2 gap-4">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={() => {
+              onClick={(e) => {
                 soundEngine.playChime(false)
-                setTheme('light')
+                setTheme('light', e)
               }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'light'
@@ -293,9 +293,9 @@ export default function SettingsPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={() => {
+              onClick={(e) => {
                 soundEngine.playChime(true)
-                setTheme('dark')
+                setTheme('dark', e)
               }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'dark'
