@@ -1,6 +1,6 @@
 // ==============================================================================
-// FlowTrack Playful Generative Groove Engine (Upbeat, Bouncy, Catchy & Fun)
-// Synthesized natively via Web Audio API (0 external assets, zero latency)
+// FlowTrack Soothing & Calm Generative Ambient Soundscape (Lusion / Meditative)
+// Synthesized natively via Web Audio API (0 external assets, zero latency, pure calm)
 // ==============================================================================
 
 class LusionAudioEngine {
@@ -9,16 +9,17 @@ class LusionAudioEngine {
   private bgmGain: GainNode | null = null
   private sfxGain: GainNode | null = null
 
-  // Playful BGM Engine Variables
+  // Ambient BGM Nodes
   private isBgmActive: boolean = false
+  private bgmOscillators: Array<{ osc: OscillatorNode; gain: GainNode }> = []
   private bgmIntervalId: any = null
-  private stepCounter: number = 0
+  private chordIntervalId: any = null
   private filterNode: BiquadFilterNode | null = null
   private delayNode: DelayNode | null = null
   private delayFeedback: GainNode | null = null
 
-  // Volume staging
-  private bgmVolume: number = 0.55
+  // Volume staging (tuned for clear, warm, soothing presence)
+  private bgmVolume: number = 0.52
   private sfxVolume: number = 0.45
   private listeners: Set<(isPlaying: boolean) => void> = new Set()
 
@@ -50,12 +51,12 @@ class LusionAudioEngine {
       this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime)
       this.sfxGain.connect(this.masterGain)
 
-      // Bouncy Stereo Ping-Pong Delay Bus
+      // Ambient Stereo Delay / Space Reverb Bus
       this.delayNode = this.ctx.createDelay()
-      this.delayNode.delayTime.setValueAtTime(0.18, this.ctx.currentTime)
+      this.delayNode.delayTime.setValueAtTime(0.42, this.ctx.currentTime)
 
       this.delayFeedback = this.ctx.createGain()
-      this.delayFeedback.gain.setValueAtTime(0.32, this.ctx.currentTime)
+      this.delayFeedback.gain.setValueAtTime(0.40, this.ctx.currentTime)
 
       this.delayNode.connect(this.delayFeedback)
       this.delayFeedback.connect(this.delayNode)
@@ -86,7 +87,7 @@ class LusionAudioEngine {
   }
 
   // ============================================================================
-  // UPBEAT & PLAYFUL GENERATIVE SYNTH-GROOVE BGM (120 BPM)
+  // SOOTHING & CALM GENERATIVE AMBIENT SOUNDSCAPE (432Hz MEDITATIVE SCALE)
   // ============================================================================
   public toggleBGM(): boolean {
     const ctx = this.ensureContext()
@@ -110,199 +111,158 @@ class LusionAudioEngine {
 
     const now = ctx.currentTime
 
-    // 1. Crisp Dynamic Lowpass Filter
+    // 1. Warm Velvet Analog Lowpass Filter (Comforting, warm timbre)
     this.filterNode = ctx.createBiquadFilter()
     this.filterNode.type = 'lowpass'
-    this.filterNode.frequency.setValueAtTime(2800, now)
+    this.filterNode.frequency.setValueAtTime(850, now)
     this.filterNode.Q.setValueAtTime(1.5, now)
     this.filterNode.connect(this.bgmGain)
 
-    // 2. Playful Chord & Bass Progression Map (C -> Am -> F -> G)
-    const patterns = [
-      {
-        bassNotes: [65.41, 65.41, 130.81, 98.0], // C2, C2, C3, G2
-        stabs: [261.63, 329.63, 392.0, 493.88],  // C4, E4, G4, B4 (Cmaj7)
-        melodyPool: [261.63, 293.66, 329.63, 392.0, 523.25, 659.25, 783.99],
-      },
-      {
-        bassNotes: [55.0, 55.0, 110.0, 82.41],   // A1, A1, A2, E2
-        stabs: [220.0, 261.63, 329.63, 392.0],   // A3, C4, E4, G4 (Am7)
-        melodyPool: [220.0, 261.63, 329.63, 440.0, 523.25, 659.25, 880.0],
-      },
-      {
-        bassNotes: [43.65, 87.31, 130.81, 87.31], // F1, F2, C3, F2
-        stabs: [174.61, 220.0, 261.63, 329.63],  // F3, A3, C4, E4 (Fmaj7)
-        melodyPool: [261.63, 329.63, 349.23, 392.0, 523.25, 659.25, 698.46],
-      },
-      {
-        bassNotes: [49.0, 98.0, 146.83, 110.0],  // G1, G2, D3, A2
-        stabs: [196.0, 246.94, 293.66, 349.23],  // G3, B3, D4, F4 (G7)
-        melodyPool: [246.94, 293.66, 392.0, 493.88, 587.33, 783.99, 987.77],
-      },
+    // 2. Meditative 432Hz Harmonic Chord Progressions (Fmaj9 -> Am9 -> Cmaj7 -> Gsus4)
+    const chordProgressions = [
+      // Fmaj9: F2, C3, E3, A3, G4
+      [87.31, 130.81, 164.81, 220.0, 392.0],
+      // Am9: A2, E3, G3, C4, B4
+      [110.0, 164.81, 196.0, 261.63, 493.88],
+      // Cmaj7: C2, G2, E3, B3, D4
+      [65.41, 98.0, 164.81, 246.94, 293.66],
+      // Gsus4: G2, D3, G3, C4, D4
+      [98.0, 146.83, 196.0, 261.63, 293.66],
     ]
 
-    this.stepCounter = 0
-    const stepTimeMs = 125 // 16th note at 120 BPM
+    let currentChordIdx = 0
 
-    // Synth Drum / Woodblock Click
-    const playClickBeat = (isAccent: boolean) => {
+    // Lush warm ambient chord pads with multi-oscillator detuning
+    const playChordPads = (chord: number[]) => {
       if (!this.isBgmActive || !ctx || !this.filterNode) return
-      const t = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
 
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(isAccent ? 1200 : 750, t)
-      osc.frequency.exponentialRampToValueAtTime(120, t + 0.025)
+      // Smoothly release previous chord pads
+      this.bgmOscillators.forEach(({ osc, gain }) => {
+        try {
+          const t = ctx.currentTime
+          gain.gain.cancelScheduledValues(t)
+          gain.gain.linearRampToValueAtTime(0, t + 1.8)
+          setTimeout(() => {
+            try {
+              osc.stop()
+              osc.disconnect()
+            } catch {}
+          }, 1900)
+        } catch {}
+      })
+      this.bgmOscillators = []
 
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(isAccent ? 0.08 : 0.04, t + 0.003)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.03)
+      const chordTime = ctx.currentTime
 
-      osc.connect(gain)
-      gain.connect(this.filterNode)
-
-      osc.start(t)
-      osc.stop(t + 0.035)
-    }
-
-    // Bouncy Synth Bass Pluck
-    const playBassNote = (freq: number) => {
-      if (!this.isBgmActive || !ctx || !this.filterNode) return
-      const t = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-
-      osc.type = 'sawtooth'
-      osc.frequency.setValueAtTime(freq, t)
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.96, t + 0.08)
-
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(0.18, t + 0.008)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
-
-      // Punchy Bass Filter
-      const bassFilter = ctx.createBiquadFilter()
-      bassFilter.type = 'lowpass'
-      bassFilter.frequency.setValueAtTime(480, t)
-      bassFilter.frequency.exponentialRampToValueAtTime(140, t + 0.2)
-
-      osc.connect(bassFilter)
-      bassFilter.connect(gain)
-      gain.connect(this.filterNode)
-
-      osc.start(t)
-      osc.stop(t + 0.24)
-    }
-
-    // Playful Bubble / Marimba Pluck
-    const playBubbleNote = (freq: number, pan: number = 0) => {
-      if (!this.isBgmActive || !ctx || !this.filterNode) return
-      const t = ctx.currentTime
-      const osc = ctx.createOscillator()
-      const oscHarmonic = ctx.createOscillator()
-      const gain = ctx.createGain()
-      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
-
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq, t)
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.02, t + 0.02)
-      osc.frequency.exponentialRampToValueAtTime(freq, t + 0.08)
-
-      oscHarmonic.type = 'triangle'
-      oscHarmonic.frequency.setValueAtTime(freq * 2, t)
-
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(0.16, t + 0.006)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25)
-
-      osc.connect(gain)
-      oscHarmonic.connect(gain)
-
-      if (panner) {
-        panner.pan.setValueAtTime(pan, t)
-        gain.connect(panner)
-        panner.connect(this.filterNode)
-        if (this.delayNode) panner.connect(this.delayNode)
-      } else {
-        gain.connect(this.filterNode)
-        if (this.delayNode) gain.connect(this.delayNode)
-      }
-
-      osc.start(t)
-      oscHarmonic.start(t)
-      osc.stop(t + 0.28)
-      oscHarmonic.stop(t + 0.28)
-    }
-
-    // Upbeat Staccato Offbeat Chord Stab
-    const playChordStab = (notes: number[]) => {
-      if (!this.isBgmActive || !ctx || !this.filterNode) return
-      const t = ctx.currentTime
-
-      notes.forEach((freq) => {
+      chord.forEach((freq, idx) => {
         if (!ctx || !this.filterNode) return
+
         const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
+        const voiceGain = ctx.createGain()
+        const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
 
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, t)
+        // Lush blend of pure sine & warm triangle
+        osc.type = idx === 0 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine'
+        osc.frequency.setValueAtTime(freq, chordTime)
 
-        gain.gain.setValueAtTime(0, t)
-        gain.gain.linearRampToValueAtTime(0.06, t + 0.006)
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+        // Micro-chorus detuning for rich organic warmth
+        const detuneAmount = (idx - 2) * 4 + (Math.random() - 0.5) * 3
+        osc.detune.setValueAtTime(detuneAmount, chordTime)
 
-        osc.connect(gain)
-        gain.connect(this.filterNode)
+        // Slow, soothing swelling envelope (1.8s attack, steady warm sustain)
+        const targetVol = idx === 0 ? 0.22 : 0.12
+        voiceGain.gain.setValueAtTime(0, chordTime)
+        voiceGain.gain.linearRampToValueAtTime(targetVol, chordTime + 1.8)
 
-        osc.start(t)
-        osc.stop(t + 0.14)
+        if (panner) {
+          panner.pan.setValueAtTime((idx - 2) * 0.35, chordTime)
+          osc.connect(voiceGain)
+          voiceGain.connect(panner)
+          panner.connect(this.filterNode)
+        } else {
+          osc.connect(voiceGain)
+          voiceGain.connect(this.filterNode)
+        }
+
+        osc.start(chordTime)
+        this.bgmOscillators.push({ osc, gain: voiceGain })
       })
     }
 
-    // Main 16th-note Playful Step Sequencer Loop
-    const runStep = () => {
-      if (!this.isBgmActive || !ctx) return
+    // Play first chord immediately
+    playChordPads(chordProgressions[currentChordIdx])
 
-      const barStep = this.stepCounter % 16 // 16 steps per bar
-      const currentBar = Math.floor(this.stepCounter / 16) % patterns.length
-      const pat = patterns[currentBar]
+    // Morph chord slowly every 7.5 seconds
+    this.chordIntervalId = setInterval(() => {
+      if (!this.isBgmActive) return
+      currentChordIdx = (currentChordIdx + 1) % chordProgressions.length
+      playChordPads(chordProgressions[currentChordIdx])
+    }, 7500)
 
-      // 1. Playful Bass (Steps 0, 4, 8, 12, with occasional 16th bounce)
-      if (barStep === 0) playBassNote(pat.bassNotes[0])
-      if (barStep === 4) playBassNote(pat.bassNotes[1])
-      if (barStep === 8) playBassNote(pat.bassNotes[2])
-      if (barStep === 11 || barStep === 14) playBassNote(pat.bassNotes[3])
+    // 3. Generative Crystalline Pentatonic Harp & Bell Drops (Calm & Soothing)
+    const bellScale = [
+      261.63, // C4
+      293.66, // D4
+      329.63, // E4
+      392.0,  // G4
+      440.0,  // A4
+      523.25, // C5
+      587.33, // D5
+      659.25, // E5
+      783.99, // G5
+      880.0,  // A5
+      1046.5, // C6
+    ]
 
-      // 2. Offbeat Funky Chord Stabs (Steps 2, 6, 10, 14)
-      if (barStep === 2 || barStep === 6 || barStep === 10 || barStep === 14) {
-        playChordStab(pat.stabs)
+    const triggerGenerativeChime = () => {
+      if (!this.isBgmActive || !ctx || !this.filterNode) return
+
+      const chimeTime = ctx.currentTime
+      const chimeFreq = bellScale[Math.floor(Math.random() * bellScale.length)]
+
+      const osc = ctx.createOscillator()
+      const chimeGain = ctx.createGain()
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(chimeFreq, chimeTime)
+
+      // Crystalline bell envelope: Gentle attack (0.05s), long peaceful decay (2.8s)
+      chimeGain.gain.setValueAtTime(0, chimeTime)
+      chimeGain.gain.linearRampToValueAtTime(0.16, chimeTime + 0.05)
+      chimeGain.gain.exponentialRampToValueAtTime(0.0001, chimeTime + 2.8)
+
+      if (panner) {
+        panner.pan.setValueAtTime((Math.random() - 0.5) * 0.85, chimeTime)
+        osc.connect(chimeGain)
+        chimeGain.connect(panner)
+        panner.connect(this.filterNode)
+        if (this.delayNode) {
+          panner.connect(this.delayNode)
+        }
+      } else {
+        osc.connect(chimeGain)
+        chimeGain.connect(this.filterNode)
+        if (this.delayNode) {
+          chimeGain.connect(this.delayNode)
+        }
       }
 
-      // 3. Playful Bubble Marimba Melodies (Dancing arpeggios on steps)
-      const playMelodySteps = [0, 3, 6, 8, 10, 12, 15]
-      if (playMelodySteps.includes(barStep)) {
-        const noteIdx = (barStep + this.stepCounter) % pat.melodyPool.length
-        const pan = ((barStep % 4) - 1.5) * 0.5
-        playBubbleNote(pat.melodyPool[noteIdx], pan)
-      }
+      osc.start(chimeTime)
+      osc.stop(chimeTime + 2.9)
 
-      // 4. Subtle Percussive Groove (Every quarter note)
-      if (barStep % 4 === 0) {
-        playClickBeat(barStep === 0)
-      }
-
-      this.stepCounter++
-      this.bgmIntervalId = setTimeout(runStep, stepTimeMs)
+      // Schedule next soothing note (every 1.5s to 3.0s)
+      const nextDelay = 1500 + Math.random() * 1500
+      this.bgmIntervalId = setTimeout(triggerGenerativeChime, nextDelay)
     }
 
-    // Start upbeat sequencer
-    runStep()
+    // Trigger first chime after 800ms
+    setTimeout(triggerGenerativeChime, 800)
 
     // Smooth BGM Master Fade In
     this.bgmGain.gain.cancelScheduledValues(now)
     this.bgmGain.gain.setValueAtTime(0, now)
-    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.4)
+    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 1.2)
   }
 
   public stopBGM() {
@@ -316,13 +276,28 @@ class LusionAudioEngine {
       this.bgmIntervalId = null
     }
 
+    if (this.chordIntervalId) {
+      clearInterval(this.chordIntervalId)
+      this.chordIntervalId = null
+    }
+
     const now = this.ctx.currentTime
     this.bgmGain.gain.cancelScheduledValues(now)
-    this.bgmGain.gain.linearRampToValueAtTime(0, now + 0.4)
+    this.bgmGain.gain.linearRampToValueAtTime(0, now + 1.0)
+
+    setTimeout(() => {
+      this.bgmOscillators.forEach(({ osc }) => {
+        try {
+          osc.stop()
+          osc.disconnect()
+        } catch {}
+      })
+      this.bgmOscillators = []
+    }, 1100)
   }
 
   // ============================================================================
-  // TACTILE SOUND EFFECTS (SFX)
+  // TACTILE LUXURY SOUND EFFECTS (SFX)
   // ============================================================================
 
   // Subtle acoustic hover tick
