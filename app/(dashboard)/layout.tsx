@@ -8,6 +8,7 @@ import { MobileNav } from '@/components/layout/MobileNav'
 import { InvoiceModal } from '@/components/invoices/InvoiceModal'
 import { ClientModal } from '@/components/clients/ClientModal'
 import { InvoicePreviewModal } from '@/components/invoices/InvoicePreviewModal'
+import { CommandPalette } from '@/components/ui/CommandPalette'
 import { dbService } from '@/lib/supabase/db-service'
 import { useAuth } from '@/lib/context/AuthContext'
 import type { Client, InvoiceWithDetails } from '@/lib/supabase/database.types'
@@ -22,6 +23,7 @@ export default function DashboardLayout({
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [previewInvoice, setPreviewInvoice] = useState<InvoiceWithDetails | null>(null)
   const [invoiceToEdit, setInvoiceToEdit] = useState<InvoiceWithDetails | null>(null)
   const [clients, setClients] = useState<Client[]>([])
@@ -31,6 +33,18 @@ export default function DashboardLayout({
       router.replace('/login')
     }
   }, [user, isLoading, router])
+
+  // Global ⌘K / Ctrl+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsCommandPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     async function fetchClients() {
@@ -85,12 +99,24 @@ export default function DashboardLayout({
             setIsInvoiceModalOpen(true)
           }}
           onOpenClientModal={() => setIsClientModalOpen(true)}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
 
         <main className="flex-1 p-5 sm:p-8 md:p-10 max-w-7xl w-full mx-auto relative z-10">
           {children}
         </main>
       </div>
+
+      {/* Spotlight Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenInvoiceModal={() => {
+          setInvoiceToEdit(null)
+          setIsInvoiceModalOpen(true)
+        }}
+        onOpenClientModal={() => setIsClientModalOpen(true)}
+      />
 
       {/* Global Quick Action Modals */}
       <InvoiceModal

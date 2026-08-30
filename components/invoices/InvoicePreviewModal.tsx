@@ -1,12 +1,15 @@
 'use client'
 
-import React from 'react'
-import { Printer, Download, Building2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { Printer, Copy, Check, CheckCheck, Building2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { InvoiceStatusBadge } from './InvoiceStatusBadge'
 import { formatCurrency, formatDate } from '@/lib/utils/formatters'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useToast } from '@/lib/context/ToastContext'
+import { dbService } from '@/lib/supabase/db-service'
+import { soundEngine } from '@/lib/utils/haptics'
 import type { InvoiceWithDetails } from '@/lib/supabase/database.types'
 
 interface InvoicePreviewModalProps {
@@ -22,13 +25,41 @@ export function InvoicePreviewModal({
   onClose,
   onEditInvoice,
 }: InvoicePreviewModalProps) {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  const { success } = useToast()
+  const [isCopied, setIsCopied] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const currency = profile?.currency || 'USD'
 
   if (!invoice) return null
 
   const handlePrint = () => {
+    soundEngine.playChime()
     window.print()
+  }
+
+  const handleCopyLink = () => {
+    soundEngine.playClick()
+    const dummyPaymentLink = `${window.location.origin}/invoices?id=${invoice.id}&pay=true`
+    navigator.clipboard.writeText(dummyPaymentLink)
+    setIsCopied(true)
+    success('Payment Link Copied', 'Direct settlement link copied to clipboard.')
+    setTimeout(() => setIsCopied(false), 2000)
+  }
+
+  const handleMarkAsPaid = async () => {
+    soundEngine.playSuccess()
+    setIsUpdating(true)
+    try {
+      await dbService.markInvoiceAsPaid(invoice.id, user?.id)
+      window.dispatchEvent(new CustomEvent('flowtrack_data_updated'))
+      success('Invoice Settled', `Invoice ${invoice.invoice_number} marked as Paid.`)
+      onClose()
+    } catch {
+      //
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const businessName = profile?.business_name || 'Rivera Design Studio'
@@ -39,15 +70,37 @@ export function InvoicePreviewModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Statement ${invoice.invoice_number}`}
-      description="Export or print this official transaction statement."
+      description="Official ledger settlement and transaction statement."
       maxWidth="3xl"
     >
       <div className="space-y-6">
         {/* Actions Bar */}
-        <div className="flex items-center justify-between no-print pb-3 border-b border-zinc-200 dark:border-white/[0.06]">
-          <InvoiceStatusBadge status={invoice.status} />
+        <div className="flex flex-wrap items-center justify-between gap-3 no-print pb-3 border-b border-zinc-200 dark:border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <InvoiceStatusBadge status={invoice.status} />
+            {invoice.status !== 'paid' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkAsPaid}
+                isLoading={isUpdating}
+                leftIcon={<CheckCheck className="w-3.5 h-3.5" />}
+              >
+                Mark Paid
+              </Button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyLink}
+              leftIcon={isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            >
+              {isCopied ? 'Link Copied' : 'Share Link'}
+            </Button>
+
             {onEditInvoice && (
               <Button
                 variant="outline"
@@ -57,7 +110,7 @@ export function InvoicePreviewModal({
                   onEditInvoice(invoice)
                 }}
               >
-                Edit Invoice
+                Edit
               </Button>
             )}
 
@@ -72,7 +125,7 @@ export function InvoicePreviewModal({
         </div>
 
         {/* Printable Invoice Sheet */}
-        <div className="bg-white text-zinc-950 dark:bg-[#0e0e12] dark:text-white p-6 sm:p-8 rounded-2xl border border-zinc-200 dark:border-white/10 shadow-sm space-y-8">
+        <div className="bg-white text-zinc-950 dark:bg-[#0e0e12] dark:text-white p-6 sm:p-8 rounded-2xl border border-zinc-200 dark:border-white/10 shadow-sm space-y-8 print:border-none print:shadow-none">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>

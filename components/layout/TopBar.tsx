@@ -13,23 +13,30 @@ import {
   Database,
   Building2,
   Flame,
+  Command,
 } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeContext'
 import { useAuth } from '@/lib/context/AuthContext'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
+import { soundEngine } from '@/lib/utils/haptics'
 
 interface TopBarProps {
   onOpenInvoiceModal?: () => void
   onOpenClientModal?: () => void
+  onOpenCommandPalette?: () => void
   onSearch?: (query: string) => void
 }
 
-export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopBarProps) {
+export function TopBar({
+  onOpenInvoiceModal,
+  onOpenClientModal,
+  onOpenCommandPalette,
+  onSearch,
+}: TopBarProps) {
   const { theme, toggleTheme } = useTheme()
   const { user, profile, signOut } = useAuth()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [searchValue, setSearchValue] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,13 +48,6 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value)
-    if (onSearch) {
-      onSearch(e.target.value)
-    }
-  }
 
   const businessName = profile?.business_name || 'Rivera Design Studio'
   const userEmail = user?.email || profile?.business_email || 'alex@riveradesign.co'
@@ -66,30 +66,47 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
 
   return (
     <header className="h-16 sticky top-0 z-20 bg-white/70 dark:bg-[#09090b]/80 backdrop-blur-2xl border-b border-zinc-200/80 dark:border-white/[0.08] px-4 sm:px-8 flex items-center justify-between gap-4 transition-colors duration-200 shadow-[inset_0_-1px_0_rgba(0,0,0,0.03)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.04)]">
-      {/* Search Bar */}
+      {/* Search Bar / Command Palette Trigger */}
       <div className="flex-1 max-w-md relative hidden sm:block">
-        <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3.5 pointer-events-none" />
-          <input
-            type="text"
-            value={searchValue}
-            onChange={handleSearchChange}
-            placeholder="Search invoices, clients, commands..."
-            className="w-full h-9 pl-9 pr-12 text-xs rounded-xl border border-zinc-200/80 dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.03] text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-white/30 focus:border-zinc-400 dark:focus:border-white/30 transition-all font-medium"
-          />
-          <kbd className="absolute right-3 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 rounded pointer-events-none">
-            ⌘K
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.playClick()
+            if (onOpenCommandPalette) onOpenCommandPalette()
+          }}
+          className="w-full h-9 pl-9 pr-12 text-xs rounded-xl border border-zinc-200/80 dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.03] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-zinc-500 dark:text-zinc-400 flex items-center justify-between transition-all font-medium text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3.5 pointer-events-none group-hover:text-zinc-950 dark:group-hover:text-white transition-colors" />
+            <span className="truncate">Search commands, invoices, clients...</span>
+          </div>
+          <kbd className="absolute right-2.5 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 rounded pointer-events-none flex items-center gap-0.5">
+            <span>⌘</span>K
           </kbd>
-        </div>
+        </button>
       </div>
 
       {/* Right Controls */}
       <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
+        {/* Quick Command Palette Button for Mobile */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            className="sm:hidden p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer"
+            aria-label="Open Command Palette"
+          >
+            <Command className="w-4 h-4" />
+          </button>
+        )}
+
         {onOpenClientModal && (
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={onOpenClientModal}
+            onClick={() => {
+              soundEngine.playClick()
+              onOpenClientModal()
+            }}
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-black/[0.04] hover:bg-black/[0.07] dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-black/5 dark:border-white/10 rounded-xl transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -101,7 +118,10 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={onOpenInvoiceModal}
+            onClick={() => {
+              soundEngine.playClick()
+              onOpenInvoiceModal()
+            }}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -109,11 +129,14 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
           </motion.button>
         )}
 
-        {/* Theme Toggle Button */}
+        {/* Theme Toggle Button with Haptic Sound */}
         <motion.button
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
-          onClick={toggleTheme}
+          onClick={() => {
+            soundEngine.playChime()
+            toggleTheme()
+          }}
           className="p-2 rounded-xl text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] border border-transparent hover:border-black/5 dark:hover:border-white/10 transition-colors cursor-pointer"
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -128,7 +151,10 @@ export function TopBar({ onOpenInvoiceModal, onOpenClientModal, onSearch }: TopB
         {/* User Profile Avatar & Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            onClick={() => {
+              soundEngine.playClick()
+              setIsDropdownOpen(!isDropdownOpen)
+            }}
             className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.02] hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-colors cursor-pointer"
             aria-expanded={isDropdownOpen}
             aria-label="User profile menu"
