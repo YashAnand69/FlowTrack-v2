@@ -18,7 +18,7 @@ class LusionAudioEngine {
   private delayNode: DelayNode | null = null
   private delayFeedback: GainNode | null = null
 
-  // Volume staging (tuned for clear, warm, soothing presence)
+  // Volume staging
   private bgmVolume: number = 0.55
   private sfxVolume: number = 0.45
   private listeners: Set<(isPlaying: boolean) => void> = new Set()
@@ -120,13 +120,9 @@ class LusionAudioEngine {
 
     // 2. Chords in 432Hz meditative scale (Fmaj9 -> Am9 -> Cmaj7 -> Gsus4)
     const chordProgressions = [
-      // Fmaj9: F2, C3, E3, A3, G4
       [87.31, 130.81, 164.81, 220.0, 392.0],
-      // Am9: A2, E3, G3, C4, B4
       [110.0, 164.81, 196.0, 261.63, 493.88],
-      // Cmaj7: C2, G2, E3, B3, D4
       [65.41, 98.0, 164.81, 246.94, 293.66],
-      // Gsus4: G2, D3, G3, C4, D4
       [98.0, 146.83, 196.0, 261.63, 293.66],
     ]
 
@@ -135,7 +131,6 @@ class LusionAudioEngine {
     const playChordPads = (chord: number[]) => {
       if (!this.isBgmActive || !ctx || !this.filterNode) return
 
-      // Stop previous chord pads gently
       this.bgmOscillators.forEach(({ osc, gain }) => {
         try {
           const t = ctx.currentTime
@@ -160,15 +155,12 @@ class LusionAudioEngine {
         const voiceGain = ctx.createGain()
         const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
 
-        // Lush blend of warm sine & soft triangle
         osc.type = idx === 0 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine'
         osc.frequency.setValueAtTime(freq, chordTime)
 
-        // Micro-chorus detuning
         const detuneAmount = (idx - 2) * 5 + (Math.random() - 0.5) * 3
         osc.detune.setValueAtTime(detuneAmount, chordTime)
 
-        // Smooth swelling envelope (Attack 2s, steady sustain)
         const targetVol = idx === 0 ? 0.22 : 0.12
         voiceGain.gain.setValueAtTime(0, chordTime)
         voiceGain.gain.linearRampToValueAtTime(targetVol, chordTime + 2.0)
@@ -188,29 +180,17 @@ class LusionAudioEngine {
       })
     }
 
-    // Play first chord immediately
     playChordPads(chordProgressions[currentChordIdx])
 
-    // Morph chord every 8 seconds
     this.chordIntervalId = setInterval(() => {
       if (!this.isBgmActive) return
       currentChordIdx = (currentChordIdx + 1) % chordProgressions.length
       playChordPads(chordProgressions[currentChordIdx])
     }, 8000)
 
-    // 3. Generative Crystalline Pentatonic Bell Chimes (Lusion signature sparkle)
+    // 3. Generative Crystalline Pentatonic Bell Chimes
     const bellScale = [
-      261.63, // C4
-      293.66, // D4
-      329.63, // E4
-      392.0,  // G4
-      440.0,  // A4
-      523.25, // C5
-      587.33, // D5
-      659.25, // E5
-      783.99, // G5
-      880.0,  // A5
-      1046.5, // C6
+      261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0, 1046.5,
     ]
 
     const triggerGenerativeChime = () => {
@@ -226,7 +206,6 @@ class LusionAudioEngine {
       osc.type = 'sine'
       osc.frequency.setValueAtTime(chimeFreq, chimeTime)
 
-      // Crystalline bell envelope: Fast attack (0.04s), long soothing decay (2.4s)
       chimeGain.gain.setValueAtTime(0, chimeTime)
       chimeGain.gain.linearRampToValueAtTime(0.16, chimeTime + 0.04)
       chimeGain.gain.exponentialRampToValueAtTime(0.0001, chimeTime + 2.5)
@@ -250,15 +229,12 @@ class LusionAudioEngine {
       osc.start(chimeTime)
       osc.stop(chimeTime + 2.6)
 
-      // Schedule next soothing note (every 1.4s to 2.8s)
       const nextDelay = 1400 + Math.random() * 1400
       this.bgmIntervalId = setTimeout(triggerGenerativeChime, nextDelay)
     }
 
-    // Trigger first chime right away
     setTimeout(triggerGenerativeChime, 800)
 
-    // Smooth BGM Master Fade In
     this.bgmGain.gain.cancelScheduledValues(now)
     this.bgmGain.gain.setValueAtTime(0, now)
     this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.8)
@@ -347,13 +323,12 @@ class LusionAudioEngine {
     } catch {}
   }
 
-  // Uplifting major chord chime (Success / Settled)
+  // Uplifting major chord chime
   public playSuccess() {
     const ctx = this.ensureContext()
     if (!ctx || !this.sfxGain) return
     try {
       const now = ctx.currentTime
-      // Harmonic major chord: C5 (523.25), E5 (659.25), G5 (783.99), C6 (1046.5)
       const freqs = [523.25, 659.25, 783.99, 1046.5]
       freqs.forEach((freq, idx) => {
         if (!ctx || !this.sfxGain) return
@@ -376,31 +351,61 @@ class LusionAudioEngine {
     } catch {}
   }
 
-  // Harmonic mode switch chime
-  public playChime(isDark: boolean = true) {
+  // Cinematic Quantum Warp Transition Sound Effect
+  public playQuantumWarp(isDark: boolean = true) {
     const ctx = this.ensureContext()
     if (!ctx || !this.sfxGain) return
     try {
       const now = ctx.currentTime
-      const freqs = isDark ? [440, 659.25, 880] : [880, 659.25, 440]
-      freqs.forEach((freq, idx) => {
+
+      // 1. Sub-Bass Swell & Detonation Sweep
+      const subOsc = ctx.createOscillator()
+      const subGain = ctx.createGain()
+
+      subOsc.type = 'sine'
+      subOsc.frequency.setValueAtTime(isDark ? 55 : 85, now)
+      subOsc.frequency.exponentialRampToValueAtTime(isDark ? 140 : 45, now + 0.35)
+
+      subGain.gain.setValueAtTime(0, now)
+      subGain.gain.linearRampToValueAtTime(0.25, now + 0.18)
+      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7)
+
+      subOsc.connect(subGain)
+      subGain.connect(this.sfxGain)
+
+      subOsc.start(now)
+      subOsc.stop(now + 0.72)
+
+      // 2. High-Frequency Glass Ping Caustic Chimes
+      const chimeFreqs = isDark
+        ? [523.25, 783.99, 1046.5, 1567.98]
+        : [1567.98, 1046.5, 783.99, 523.25]
+
+      chimeFreqs.forEach((freq, idx) => {
         if (!ctx || !this.sfxGain) return
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
+        const chimeOsc = ctx.createOscillator()
+        const chimeGain = ctx.createGain()
 
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now + idx * 0.05)
+        const triggerAt = now + 0.28 + idx * 0.045
+        chimeOsc.type = 'sine'
+        chimeOsc.frequency.setValueAtTime(freq, triggerAt)
 
-        gain.gain.setValueAtTime(0.1, now + idx * 0.05)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.05 + 0.3)
+        chimeGain.gain.setValueAtTime(0, triggerAt)
+        chimeGain.gain.linearRampToValueAtTime(0.12, triggerAt + 0.02)
+        chimeGain.gain.exponentialRampToValueAtTime(0.0001, triggerAt + 0.45)
 
-        osc.connect(gain)
-        gain.connect(this.sfxGain)
+        chimeOsc.connect(chimeGain)
+        chimeGain.connect(this.sfxGain)
 
-        osc.start(now + idx * 0.05)
-        osc.stop(now + idx * 0.05 + 0.32)
+        chimeOsc.start(triggerAt)
+        chimeOsc.stop(triggerAt + 0.48)
       })
     } catch {}
+  }
+
+  // Harmonic mode switch chime
+  public playChime(isDark: boolean = true) {
+    this.playQuantumWarp(isDark)
   }
 
   // Soft delete tone
