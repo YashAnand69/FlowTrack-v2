@@ -403,30 +403,32 @@ class LusionAudioEngine {
     } catch {}
   }
 
-  // Harmonic mode switch chime (Gentle acoustic glass drop)
+  // Meditative Mode Transition Chord (Slow soothing singing bowl / crystal pad)
   public playChime(isDark: boolean = true) {
     const ctx = this.ensureContext()
     if (!ctx || !this.sfxGain) return
     try {
       const now = ctx.currentTime
-      const freqs = isDark ? [523.25, 783.99] : [783.99, 1046.5]
+      // Meditative 432Hz harmonic chord: F3, C4, A4 / C4, G4, E5
+      const freqs = isDark ? [174.61, 261.63, 440.0] : [261.63, 392.0, 659.25]
       freqs.forEach((freq, idx) => {
         if (!ctx || !this.sfxGain) return
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
 
         osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now + idx * 0.04)
+        osc.frequency.setValueAtTime(freq, now)
 
-        gain.gain.setValueAtTime(0, now + idx * 0.04)
-        gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.04 + 0.015)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.04 + 0.28)
+        // Slow swelling envelope (0.4s attack, 1.2s smooth decay)
+        gain.gain.setValueAtTime(0, now)
+        gain.gain.linearRampToValueAtTime(0.09, now + 0.35 + idx * 0.05)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5)
 
         osc.connect(gain)
         gain.connect(this.sfxGain)
 
-        osc.start(now + idx * 0.04)
-        osc.stop(now + idx * 0.04 + 0.3)
+        osc.start(now)
+        osc.stop(now + 1.55)
       })
     } catch {}
   }

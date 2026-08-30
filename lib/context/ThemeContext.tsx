@@ -56,26 +56,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(transitionTimeoutRef.current)
     }
 
-    // Step 1: Start calm liquid ripple transition
+    // Step 1: Start deliberate, unhurried cinematic transition (1.65s total)
     setTransitionState({
       isTransitioning: true,
       targetTheme: t,
     })
 
-    // Step 2: Swap the underlying DOM theme cleanly at peak ripple coverage (180ms)
+    // Step 2: Swap the underlying DOM theme cleanly at peak meditative mist (650ms)
     setTimeout(() => {
       setThemeState(t)
       applyThemeClass(t)
       localStorage.setItem('flowtrack_theme', t)
-    }, 180)
+    }, 650)
 
-    // Step 3: Dismiss calm ripple smoothly (620ms)
+    // Step 3: Dissolve the mist gracefully (1650ms)
     transitionTimeoutRef.current = setTimeout(() => {
       setTransitionState({
         isTransitioning: false,
         targetTheme: null,
       })
-    }, 620)
+    }, 1650)
   }
 
   const toggleTheme = () => {
