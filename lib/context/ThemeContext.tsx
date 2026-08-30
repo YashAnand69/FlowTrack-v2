@@ -56,26 +56,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(transitionTimeoutRef.current)
     }
 
-    // Step 1: Start smooth curtain fade
+    // Step 1: Trigger liquid portal shockwaves and 3D hologram
     setTransitionState({
       isTransitioning: true,
       targetTheme: t,
     })
 
-    // Step 2: Swap theme cleanly behind the velvet curtain at peak opacity (180ms)
+    // Step 2: Swap the underlying DOM theme cleanly at peak shockwave expansion (240ms)
     setTimeout(() => {
       setThemeState(t)
       applyThemeClass(t)
       localStorage.setItem('flowtrack_theme', t)
-    }, 180)
+    }, 240)
 
-    // Step 3: Dissolve the curtain smoothly
+    // Step 3: Dismiss fluid portal smoothly (850ms)
     transitionTimeoutRef.current = setTimeout(() => {
       setTransitionState({
         isTransitioning: false,
         targetTheme: null,
       })
-    }, 700)
+    }, 850)
   }
 
   const toggleTheme = () => {
