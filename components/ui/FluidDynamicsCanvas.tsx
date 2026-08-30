@@ -3,34 +3,55 @@
 import React, { useEffect, useRef } from 'react'
 import { useTheme } from '@/lib/context/ThemeContext'
 
-interface FluidDyeDrop {
+interface FluidDyeTrail {
+  points: Array<{ x: number; y: number; vx: number; vy: number; width: number; alpha: number }>
+  life: number
+  maxLife: number
+  decay: number
+}
+
+interface FluidEddy {
   x: number
   y: number
   vx: number
   vy: number
   radius: number
+  growth: number
+  rotation: number
+  spinSpeed: number
+  strength: number
   life: number
   maxLife: number
-  alpha: number
-  baseAlpha: number
+  filaments: Array<{ angle: number; length: number; speed: number }>
 }
 
-interface CausticWave {
+interface HydraulicShockwave {
   x: number
   y: number
   radius: number
   maxRadius: number
-  alpha: number
+  intensity: number
   speed: number
+  waveWidth: number
 }
 
-interface FluidRibbonStream {
-  points: Array<{ x: number; y: number; vx: number; vy: number; baseWave: number }>
-  width: number
+interface LiquidSilkSheet {
+  points: Array<{
+    x: number
+    y: number
+    vx: number
+    vy: number
+    mass: number
+    pinnedY: number
+  }>
   baseY: number
-  phase: number
-  speed: number
   amplitude: number
+  wavelength: number
+  frequency: number
+  phase: number
+  thickness: number
+  glowAlpha: number
+  specularAlpha: number
 }
 
 export function FluidDynamicsCanvas() {
@@ -46,6 +67,7 @@ export function FluidDynamicsCanvas() {
     lastY: -1000,
     active: false,
     down: false,
+    pressTime: 0,
   })
 
   useEffect(() => {
@@ -67,34 +89,40 @@ export function FluidDynamicsCanvas() {
 
     const isDark = theme === 'dark'
 
-    // Fluid collections
-    const fluidDye: FluidDyeDrop[] = []
-    const causticWaves: CausticWave[] = []
+    // Multi-layer dynamic fluid elements
+    const dyeTrails: FluidDyeTrail[] = []
+    const eddies: FluidEddy[] = []
+    const shockwaves: HydraulicShockwave[] = []
 
-    // 4 Continuous liquid silk / caustic streams
-    const ribbonCount = 4
-    const ribbonSegments = 28
-    const ribbons: FluidRibbonStream[] = []
+    // 5 Volumetric Liquid Sheets with Specular Crest Highlights (Apple/Lusion liquid metal sheets)
+    const sheetCount = 5
+    const segments = 32
+    const sheets: LiquidSilkSheet[] = []
 
-    for (let r = 0; r < ribbonCount; r++) {
-      const baseY = height * (0.18 + (r / (ribbonCount - 1 || 1)) * 0.68)
+    for (let i = 0; i < sheetCount; i++) {
+      const baseY = height * (0.16 + (i / (sheetCount - 1 || 1)) * 0.72)
       const points = []
-      for (let s = 0; s <= ribbonSegments; s++) {
+      for (let s = 0; s <= segments; s++) {
+        const x = (width / segments) * s
         points.push({
-          x: (width / ribbonSegments) * s,
+          x,
           y: baseY,
           vx: 0,
           vy: 0,
-          baseWave: 0,
+          mass: 0.8 + Math.sin((s / segments) * Math.PI) * 0.4,
+          pinnedY: baseY,
         })
       }
-      ribbons.push({
+      sheets.push({
         points,
-        width: 140 + r * 45,
         baseY,
-        phase: r * (Math.PI / 2.5),
-        speed: 0.0012 + r * 0.0004,
-        amplitude: 45 + r * 18,
+        amplitude: 38 + i * 14,
+        wavelength: 2.2 + i * 0.4,
+        frequency: 0.001 + i * 0.0003,
+        phase: i * (Math.PI / 3),
+        thickness: 90 + i * 35,
+        glowAlpha: isDark ? 0.035 + i * 0.012 : 0.025 + i * 0.008,
+        specularAlpha: isDark ? 0.28 + i * 0.08 : 0.18 + i * 0.05,
       })
     }
 
@@ -110,39 +138,17 @@ export function FluidDynamicsCanvas() {
       canvas.style.height = `${height}px`
       ctx.scale(dpr, dpr)
 
-      // Re-anchor ribbon points
-      ribbons.forEach((ribbon, r) => {
-        ribbon.baseY = height * (0.18 + (r / (ribbonCount - 1 || 1)) * 0.68)
-        ribbon.points.forEach((p, s) => {
-          p.x = (width / ribbonSegments) * s
-          p.y = ribbon.baseY
+      sheets.forEach((sheet, i) => {
+        sheet.baseY = height * (0.16 + (i / (sheetCount - 1 || 1)) * 0.72)
+        sheet.points.forEach((p, s) => {
+          p.x = (width / segments) * s
+          p.pinnedY = sheet.baseY
+          p.y = sheet.baseY
         })
       })
     }
 
-    const emitFluid = (x: number, y: number, vx: number, vy: number, speed: number) => {
-      const count = Math.min(Math.max(Math.ceil(speed / 4), 2), 6)
-      for (let c = 0; c < count; c++) {
-        const spread = (Math.random() - 0.5) * 20
-        const radius = Math.min(45 + speed * 1.5 + Math.random() * 30, 140)
-        fluidDye.push({
-          x: x + spread,
-          y: y + spread,
-          vx: vx * 0.25 + (Math.random() - 0.5) * 1.8,
-          vy: vy * 0.25 + (Math.random() - 0.5) * 1.8,
-          radius,
-          life: 0,
-          maxLife: 40 + Math.random() * 30,
-          alpha: isDark ? 0.35 + Math.random() * 0.15 : 0.22 + Math.random() * 0.12,
-          baseAlpha: isDark ? 0.35 + Math.random() * 0.15 : 0.22 + Math.random() * 0.12,
-        })
-      }
-
-      // Limit array length for buttery 60FPS
-      if (fluidDye.length > 90) {
-        fluidDye.splice(0, fluidDye.length - 90)
-      }
-    }
+    let activeTrail: FluidDyeTrail | null = null
 
     const handlePointerMove = (e: PointerEvent | MouseEvent) => {
       const mouse = mouseRef.current
@@ -158,20 +164,61 @@ export function FluidDynamicsCanvas() {
       const dy = currentY - mouse.lastY
       const currentSpeed = Math.sqrt(dx * dx + dy * dy)
 
-      mouse.vx = dx * 0.5
-      mouse.vy = dy * 0.5
+      mouse.vx = dx * 0.65
+      mouse.vy = dy * 0.65
       mouse.speed = currentSpeed
       mouse.x = currentX
       mouse.y = currentY
       mouse.active = true
 
-      // Interpolate smooth continuous fluid emission along pointer trajectory
-      const steps = Math.min(Math.max(Math.ceil(currentSpeed / 8), 1), 6)
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps
-        const ix = mouse.lastX + dx * t
-        const iy = mouse.lastY + dy * t
-        emitFluid(ix, iy, mouse.vx, mouse.vy, currentSpeed)
+      // Dynamic liquid ribbon emission
+      if (!activeTrail || activeTrail.points.length > 25) {
+        activeTrail = {
+          points: [],
+          life: 0,
+          maxLife: 60,
+          decay: 0.965,
+        }
+        dyeTrails.push(activeTrail)
+        if (dyeTrails.length > 18) dyeTrails.shift()
+      }
+
+      // Add fluid trail point with hydrodynamic spread
+      const ribbonWidth = Math.min(18 + currentSpeed * 1.6, 85)
+      activeTrail.points.push({
+        x: currentX,
+        y: currentY,
+        vx: dx * 0.2 + (Math.random() - 0.5) * 1.5,
+        vy: dy * 0.2 + (Math.random() - 0.5) * 1.5,
+        width: ribbonWidth,
+        alpha: isDark ? Math.min(0.35 + currentSpeed * 0.015, 0.75) : Math.min(0.25 + currentSpeed * 0.01, 0.55),
+      })
+
+      // Spawn curling Navier-Stokes eddies on rapid sweeps
+      if (currentSpeed > 14 && eddies.length < 8) {
+        const filaments = []
+        for (let f = 0; f < 5; f++) {
+          filaments.push({
+            angle: (f / 5) * Math.PI * 2,
+            length: 25 + Math.random() * 40,
+            speed: (Math.random() * 0.06 + 0.03) * (dx > 0 ? 1 : -1),
+          })
+        }
+
+        eddies.push({
+          x: currentX,
+          y: currentY,
+          vx: dx * 0.18,
+          vy: dy * 0.18,
+          radius: 20 + currentSpeed * 0.8,
+          growth: 0.9,
+          rotation: Math.random() * Math.PI * 2,
+          spinSpeed: (dx > 0 ? 1 : -1) * (0.04 + Math.min(currentSpeed * 0.003, 0.08)),
+          strength: isDark ? 0.45 : 0.32,
+          life: 0,
+          maxLife: 45 + Math.random() * 20,
+          filaments,
+        })
       }
 
       mouse.lastX = currentX
@@ -180,29 +227,40 @@ export function FluidDynamicsCanvas() {
 
     const handlePointerDown = (e: PointerEvent | MouseEvent) => {
       mouseRef.current.down = true
-      // Expanding liquid caustic shockwave
-      causticWaves.push({
+      mouseRef.current.pressTime = Date.now()
+
+      // Primary & secondary hydraulic shockwave rings
+      shockwaves.push({
         x: e.clientX,
         y: e.clientY,
-        radius: 15,
-        maxRadius: Math.min(width, height) * 0.5,
-        alpha: isDark ? 0.45 : 0.32,
-        speed: 8.5,
+        radius: 12,
+        maxRadius: Math.min(width, height) * 0.55,
+        intensity: isDark ? 0.75 : 0.55,
+        speed: 10.5,
+        waveWidth: 45,
       })
 
-      // Dense burst of liquid dye
-      for (let a = 0; a < 8; a++) {
-        const angle = (a / 8) * Math.PI * 2
-        fluidDye.push({
-          x: e.clientX + Math.cos(angle) * 20,
-          y: e.clientY + Math.sin(angle) * 20,
-          vx: Math.cos(angle) * 3.5,
-          vy: Math.sin(angle) * 3.5,
-          radius: 90,
+      // Dense fluid burst
+      for (let k = 0; k < 6; k++) {
+        const angle = (k / 6) * Math.PI * 2
+        const burstSpeed = 4.5
+        eddies.push({
+          x: e.clientX,
+          y: e.clientY,
+          vx: Math.cos(angle) * burstSpeed,
+          vy: Math.sin(angle) * burstSpeed,
+          radius: 35,
+          growth: 1.2,
+          rotation: angle,
+          spinSpeed: (k % 2 === 0 ? 1 : -1) * 0.06,
+          strength: isDark ? 0.6 : 0.4,
           life: 0,
           maxLife: 50,
-          alpha: isDark ? 0.45 : 0.3,
-          baseAlpha: isDark ? 0.45 : 0.3,
+          filaments: [
+            { angle: 0, length: 45, speed: 0.05 },
+            { angle: Math.PI * 0.6, length: 35, speed: -0.05 },
+            { angle: Math.PI * 1.3, length: 40, speed: 0.04 },
+          ],
         })
       }
     }
@@ -213,6 +271,7 @@ export function FluidDynamicsCanvas() {
 
     const handlePointerLeave = () => {
       mouseRef.current.active = false
+      activeTrail = null
     }
 
     window.addEventListener('resize', handleResize)
@@ -223,215 +282,329 @@ export function FluidDynamicsCanvas() {
 
     let time = 0
 
-    // Main 60FPS Fluid Dynamics Render Loop
+    // Master 60FPS Fluid Dynamics Engine
     const render = () => {
       time += 0.016
       ctx.clearRect(0, 0, width, height)
 
       const mouse = mouseRef.current
-      mouse.vx *= 0.9
-      mouse.vy *= 0.9
-      mouse.speed *= 0.9
+      mouse.vx *= 0.91
+      mouse.vy *= 0.91
+      mouse.speed *= 0.91
 
       // ======================================================================
-      // 1. VISIBLE CONTINUOUS SILKY LIQUID SATIN STREAMS
+      // 1. VOLUMETRIC LIQUID SILK SHEETS WITH SPECULAR CREST LIGHTING
       // ======================================================================
-      for (let r = 0; r < ribbons.length; r++) {
-        const ribbon = ribbons[r]
-        const points = ribbon.points
+      for (let i = 0; i < sheets.length; i++) {
+        const sheet = sheets[i]
+        const points = sheet.points
 
-        // Multi-frequency harmonic Navier-Stokes liquid wave math
+        // Multi-frequency harmonic liquid wave physics with hydrodynamic drag
         for (let s = 0; s < points.length; s++) {
           const p = points[s]
           const normX = p.x / width
 
-          const wave =
-            Math.sin(time * 0.9 + normX * 3.8 + ribbon.phase) * ribbon.amplitude +
-            Math.sin(time * 1.6 + normX * 6.5) * (ribbon.amplitude * 0.45) +
-            Math.cos(time * 0.6 + normX * 2.2) * (ribbon.amplitude * 0.6)
+          // Complex multi-octave harmonic fluid motion
+          const wave1 = Math.sin(time * 0.85 + normX * sheet.wavelength * 3.5 + sheet.phase) * sheet.amplitude
+          const wave2 = Math.sin(time * 1.7 + normX * 7.5 + sheet.phase * 1.5) * (sheet.amplitude * 0.4)
+          const wave3 = Math.cos(time * 0.45 + normX * 1.8) * (sheet.amplitude * 0.6)
+          const wave = wave1 + wave2 + wave3
 
-          // Fluid displacement from cursor
+          // Direct hydrodynamic displacement from pointer momentum & shockwaves
           if (mouse.active) {
             const dx = p.x - mouse.x
             const dy = p.y - mouse.y
             const dist = Math.sqrt(dx * dx + dy * dy)
-            const influence = 220
+            const influence = 240
 
             if (dist < influence) {
-              const factor = (1 - dist / influence) * (mouse.down ? 45 : 28)
+              const factor = Math.pow(1 - dist / influence, 2) * (mouse.down ? 65 : 36)
               const angle = Math.atan2(dy, dx)
-              p.vx += Math.cos(angle) * factor * 0.2 + mouse.vx * factor * 0.08
-              p.vy += Math.sin(angle) * factor * 0.2 + mouse.vy * factor * 0.08
+              p.vx += (Math.cos(angle) * factor * 0.25 + mouse.vx * factor * 0.1) / p.mass
+              p.vy += (Math.sin(angle) * factor * 0.25 + mouse.vy * factor * 0.1) / p.mass
             }
           }
 
-          // Viscous restoration
-          const targetY = ribbon.baseY + wave
-          p.vy = (p.vy + (targetY - p.y) * 0.045) * 0.86
-          p.vx *= 0.86
+          // Shockwave displacement
+          for (let w = 0; w < shockwaves.length; w++) {
+            const sw = shockwaves[w]
+            const sdx = p.x - sw.x
+            const sdy = p.y - sw.y
+            const sdist = Math.sqrt(sdx * sdx + sdy * sdy)
+            const ringDiff = Math.abs(sdist - sw.radius)
+
+            if (ringDiff < sw.waveWidth) {
+              const wavePower = (1 - ringDiff / sw.waveWidth) * sw.intensity * 25
+              const sAngle = Math.atan2(sdy, sdx)
+              p.vy += Math.sin(sAngle) * wavePower * 0.3
+            }
+          }
+
+          // Viscous hydrodynamic damping & spring restoration
+          const targetY = sheet.baseY + wave
+          const forceY = (targetY - p.y) * 0.05
+          p.vy = (p.vy + forceY / p.mass) * 0.87
+          p.vx *= 0.87
 
           p.y += p.vy
           p.x += p.vx
         }
 
-        // Draw continuous smooth Bézier ribbon
+        // Draw Continuous Liquid Silk Sheet Body
         ctx.beginPath()
-        ctx.moveTo(points[0].x, points[0].y - ribbon.width * 0.5)
+        ctx.moveTo(points[0].x, points[0].y - sheet.thickness * 0.5)
 
-        for (let i = 0; i < points.length - 1; i++) {
-          const p0 = points[i]
-          const p1 = points[i + 1]
+        // Top contour (Smooth Bézier spine)
+        for (let s = 0; s < points.length - 1; s++) {
+          const p0 = points[s]
+          const p1 = points[s + 1]
           const mx = (p0.x + p1.x) * 0.5
-          const my = (p0.y + p1.y) * 0.5 - ribbon.width * 0.5
-          ctx.quadraticCurveTo(p0.x, p0.y - ribbon.width * 0.5, mx, my)
+          const my = (p0.y + p1.y) * 0.5 - sheet.thickness * 0.5
+          ctx.quadraticCurveTo(p0.x, p0.y - sheet.thickness * 0.5, mx, my)
         }
         const lastP = points[points.length - 1]
-        ctx.lineTo(lastP.x, lastP.y - ribbon.width * 0.5)
+        ctx.lineTo(lastP.x, lastP.y - sheet.thickness * 0.5)
 
-        // Bottom boundary reverse
-        ctx.lineTo(lastP.x, lastP.y + ribbon.width * 0.5)
-        for (let i = points.length - 1; i > 0; i--) {
-          const p0 = points[i]
-          const p1 = points[i - 1]
+        // Bottom contour (Reverse smooth Bézier spine)
+        ctx.lineTo(lastP.x, lastP.y + sheet.thickness * 0.5)
+        for (let s = points.length - 1; s > 0; s--) {
+          const p0 = points[s]
+          const p1 = points[s - 1]
           const mx = (p0.x + p1.x) * 0.5
-          const my = (p0.y + p1.y) * 0.5 + ribbon.width * 0.5
-          ctx.quadraticCurveTo(p0.x, p0.y + ribbon.width * 0.5, mx, my)
+          const my = (p0.y + p1.y) * 0.5 + sheet.thickness * 0.5
+          ctx.quadraticCurveTo(p0.x, p0.y + sheet.thickness * 0.5, mx, my)
         }
-        ctx.lineTo(points[0].x, points[0].y + ribbon.width * 0.5)
+        ctx.lineTo(points[0].x, points[0].y + sheet.thickness * 0.5)
         ctx.closePath()
 
-        // Luminous volumetric fluid gradient fill
-        const ribbonGrad = ctx.createLinearGradient(
+        // Volumetric liquid sheen gradient
+        const sheetGrad = ctx.createLinearGradient(
           0,
-          ribbon.baseY - ribbon.width,
+          sheet.baseY - sheet.thickness,
           0,
-          ribbon.baseY + ribbon.width
+          sheet.baseY + sheet.thickness
         )
         if (isDark) {
-          ribbonGrad.addColorStop(0, 'rgba(255, 255, 255, 0)')
-          ribbonGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.045 + r * 0.015})`)
-          ribbonGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+          sheetGrad.addColorStop(0, 'rgba(255, 255, 255, 0)')
+          sheetGrad.addColorStop(0.3, `rgba(255, 255, 255, ${sheet.glowAlpha * 0.6})`)
+          sheetGrad.addColorStop(0.5, `rgba(255, 255, 255, ${sheet.glowAlpha * 1.4})`)
+          sheetGrad.addColorStop(0.7, `rgba(255, 255, 255, ${sheet.glowAlpha * 0.6})`)
+          sheetGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          ribbonGrad.addColorStop(0, 'rgba(0, 0, 0, 0)')
-          ribbonGrad.addColorStop(0.5, `rgba(0, 0, 0, ${0.035 + r * 0.012})`)
-          ribbonGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+          sheetGrad.addColorStop(0, 'rgba(0, 0, 0, 0)')
+          sheetGrad.addColorStop(0.3, `rgba(0, 0, 0, ${sheet.glowAlpha * 0.5})`)
+          sheetGrad.addColorStop(0.5, `rgba(0, 0, 0, ${sheet.glowAlpha * 1.2})`)
+          sheetGrad.addColorStop(0.7, `rgba(0, 0, 0, ${sheet.glowAlpha * 0.5})`)
+          sheetGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
-        ctx.fillStyle = ribbonGrad
+        ctx.fillStyle = sheetGrad
         ctx.fill()
+
+        // DRAW SPECULAR LIQUID GLASS RIDGE HIGHLIGHT (Apple/Lusion liquid edge refraction)
+        ctx.beginPath()
+        ctx.moveTo(points[0].x, points[0].y)
+        for (let s = 0; s < points.length - 1; s++) {
+          const p0 = points[s]
+          const p1 = points[s + 1]
+          const mx = (p0.x + p1.x) * 0.5
+          const my = (p0.y + p1.y) * 0.5
+          ctx.quadraticCurveTo(p0.x, p0.y, mx, my)
+        }
+        ctx.lineTo(lastP.x, lastP.y)
+
+        ctx.strokeStyle = isDark
+          ? `rgba(255, 255, 255, ${sheet.specularAlpha * 0.45})`
+          : `rgba(0, 0, 0, ${sheet.specularAlpha * 0.35})`
+        ctx.lineWidth = 1.2
+        ctx.stroke()
       }
 
       // ======================================================================
-      // 2. VOLUMETRIC LIQUID SMOKE & DYE SWIRLS (Mouse interactive fluid)
+      // 2. BUTTERY LIQUID DYE RIBBONS (Continuous smooth brush dynamics)
       // ======================================================================
-      for (let i = fluidDye.length - 1; i >= 0; i--) {
-        const d = fluidDye[i]
+      for (let t = dyeTrails.length - 1; t >= 0; t--) {
+        const trail = dyeTrails[t]
+        trail.life++
 
-        // Fluid curl & viscous advection
-        const curlX = Math.sin(d.y * 0.015 + time * 2) * 0.65
-        const curlY = Math.cos(d.x * 0.015 + time * 2) * 0.65
-
-        d.x += d.vx + curlX
-        d.y += d.vy + curlY
-        d.vx *= 0.93
-        d.vy *= 0.93
-        d.radius += 0.8 // Natural continuous fluid expansion
-        d.life++
-
-        const progress = d.life / d.maxLife
-        const alpha = (1 - progress) * d.baseAlpha
-
-        if (progress >= 1) {
-          fluidDye.splice(i, 1)
+        if (trail.life >= trail.maxLife || trail.points.length < 2) {
+          dyeTrails.splice(t, 1)
           continue
         }
 
-        // Render soft Gaussian liquid smoke puff with glowing core
-        const dyeGrad = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.radius)
-        if (isDark) {
-          dyeGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`)
-          dyeGrad.addColorStop(0.35, `rgba(255, 255, 255, ${alpha * 0.55})`)
-          dyeGrad.addColorStop(0.7, `rgba(255, 255, 255, ${alpha * 0.2})`)
-          dyeGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
-        } else {
-          dyeGrad.addColorStop(0, `rgba(0, 0, 0, ${alpha * 0.85})`)
-          dyeGrad.addColorStop(0.35, `rgba(0, 0, 0, ${alpha * 0.45})`)
-          dyeGrad.addColorStop(0.7, `rgba(0, 0, 0, ${alpha * 0.15})`)
-          dyeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        const pts = trail.points
+        const trailProgress = trail.life / trail.maxLife
+        const lifeAlpha = 1 - trailProgress
+
+        // Advect points with natural fluid curl
+        for (let p = 0; p < pts.length; p++) {
+          const pt = pts[p]
+          pt.x += pt.vx
+          pt.y += pt.vy
+          pt.vx *= 0.93
+          pt.vy *= 0.93
+          pt.width += 0.6 // Natural dye spreading
+          pt.alpha *= trail.decay
         }
 
-        ctx.fillStyle = dyeGrad
-        ctx.beginPath()
-        ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2)
-        ctx.fill()
+        // Render multi-segment continuous fluid stroke
+        for (let p = 0; p < pts.length - 1; p++) {
+          const p0 = pts[p]
+          const p1 = pts[p + 1]
+          const currentAlpha = p0.alpha * lifeAlpha
+
+          if (currentAlpha <= 0.01) continue
+
+          const strokeGrad = ctx.createRadialGradient(
+            (p0.x + p1.x) * 0.5,
+            (p0.y + p1.y) * 0.5,
+            0,
+            (p0.x + p1.x) * 0.5,
+            (p0.y + p1.y) * 0.5,
+            p0.width
+          )
+
+          if (isDark) {
+            strokeGrad.addColorStop(0, `rgba(255, 255, 255, ${currentAlpha * 0.85})`)
+            strokeGrad.addColorStop(0.4, `rgba(255, 255, 255, ${currentAlpha * 0.4})`)
+            strokeGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+          } else {
+            strokeGrad.addColorStop(0, `rgba(0, 0, 0, ${currentAlpha * 0.75})`)
+            strokeGrad.addColorStop(0.4, `rgba(0, 0, 0, ${currentAlpha * 0.3})`)
+            strokeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+          }
+
+          ctx.fillStyle = strokeGrad
+          ctx.beginPath()
+          ctx.arc((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, p0.width, 0, Math.PI * 2)
+          ctx.fill()
+        }
       }
 
       // ======================================================================
-      // 3. EXPANDING LIQUID CAUSTIC RIPPLE WAVES
+      // 3. NAVIER-STOKES VORTEX EDDIES & SPIRALING FILAMENTS
       // ======================================================================
-      for (let r = causticWaves.length - 1; r >= 0; r--) {
-        const rip = causticWaves[r]
-        rip.radius += rip.speed
-        rip.alpha *= 0.94
+      for (let e = eddies.length - 1; e >= 0; e--) {
+        const eddy = eddies[e]
+        eddy.life++
+        eddy.radius += eddy.growth
+        eddy.rotation += eddy.spinSpeed
+        eddy.x += eddy.vx
+        eddy.y += eddy.vy
+        eddy.vx *= 0.94
+        eddy.vy *= 0.94
 
-        if (rip.radius >= rip.maxRadius || rip.alpha < 0.005) {
-          causticWaves.splice(r, 1)
+        const eddyProgress = eddy.life / eddy.maxLife
+        const eddyAlpha = (1 - eddyProgress) * eddy.strength
+
+        if (eddyProgress >= 1 || eddyAlpha <= 0.01) {
+          eddies.splice(e, 1)
           continue
         }
 
-        const ripGrad = ctx.createRadialGradient(
-          rip.x,
-          rip.y,
-          Math.max(0, rip.radius - 40),
-          rip.x,
-          rip.y,
-          rip.radius
-        )
+        // Draw vortex core glow
+        const coreGrad = ctx.createRadialGradient(eddy.x, eddy.y, 0, eddy.x, eddy.y, eddy.radius)
         if (isDark) {
-          ripGrad.addColorStop(0, 'rgba(255, 255, 255, 0)')
-          ripGrad.addColorStop(0.7, `rgba(255, 255, 255, ${rip.alpha * 0.6})`)
-          ripGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+          coreGrad.addColorStop(0, `rgba(255, 255, 255, ${eddyAlpha * 0.5})`)
+          coreGrad.addColorStop(0.5, `rgba(255, 255, 255, ${eddyAlpha * 0.15})`)
+          coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          ripGrad.addColorStop(0, 'rgba(0, 0, 0, 0)')
-          ripGrad.addColorStop(0.7, `rgba(0, 0, 0, ${rip.alpha * 0.45})`)
-          ripGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+          coreGrad.addColorStop(0, `rgba(0, 0, 0, ${eddyAlpha * 0.4})`)
+          coreGrad.addColorStop(0.5, `rgba(0, 0, 0, ${eddyAlpha * 0.12})`)
+          coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
-        ctx.fillStyle = ripGrad
+        ctx.fillStyle = coreGrad
         ctx.beginPath()
-        ctx.arc(rip.x, rip.y, rip.radius, 0, Math.PI * 2)
+        ctx.arc(eddy.x, eddy.y, eddy.radius, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Draw spiraling fluid filaments
+        ctx.lineWidth = 1.0
+        for (let f = 0; f < eddy.filaments.length; f++) {
+          const fil = eddy.filaments[f]
+          fil.angle += fil.speed
+
+          const startAngle = eddy.rotation + fil.angle
+          const endAngle = startAngle + 1.2
+
+          ctx.beginPath()
+          ctx.arc(eddy.x, eddy.y, eddy.radius * 0.7, startAngle, endAngle)
+          ctx.strokeStyle = isDark
+            ? `rgba(255, 255, 255, ${eddyAlpha * 0.35})`
+            : `rgba(0, 0, 0, ${eddyAlpha * 0.25})`
+          ctx.stroke()
+        }
+      }
+
+      // ======================================================================
+      // 4. HYDRAULIC REFRACTIVE SHOCKWAVE EXPANSION
+      // ======================================================================
+      for (let s = shockwaves.length - 1; s >= 0; s--) {
+        const sw = shockwaves[s]
+        sw.radius += sw.speed
+        sw.intensity *= 0.945
+
+        if (sw.radius >= sw.maxRadius || sw.intensity <= 0.01) {
+          shockwaves.splice(s, 1)
+          continue
+        }
+
+        const shockGrad = ctx.createRadialGradient(
+          sw.x,
+          sw.y,
+          Math.max(0, sw.radius - sw.waveWidth),
+          sw.x,
+          sw.y,
+          sw.radius
+        )
+        if (isDark) {
+          shockGrad.addColorStop(0, 'rgba(255, 255, 255, 0)')
+          shockGrad.addColorStop(0.7, `rgba(255, 255, 255, ${sw.intensity * 0.5})`)
+          shockGrad.addColorStop(0.9, `rgba(255, 255, 255, ${sw.intensity * 0.8})`)
+          shockGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+        } else {
+          shockGrad.addColorStop(0, 'rgba(0, 0, 0, 0)')
+          shockGrad.addColorStop(0.7, `rgba(0, 0, 0, ${sw.intensity * 0.38})`)
+          shockGrad.addColorStop(0.9, `rgba(0, 0, 0, ${sw.intensity * 0.65})`)
+          shockGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        }
+
+        ctx.fillStyle = shockGrad
+        ctx.beginPath()
+        ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2)
         ctx.fill()
       }
 
       // ======================================================================
-      // 4. LUMINOUS VISCOUS LIQUID CURSOR CAUSTIC SPOTLIGHT
+      // 5. CAUSTIC LIQUID SPOTLIGHT (Subtle cursor ambient glow)
       // ======================================================================
       if (mouse.active && mouse.x > 0) {
-        const causticRadius = 240 + mouse.speed * 3.0
-        const causticGrad = ctx.createRadialGradient(
+        const spotlightRadius = 260 + mouse.speed * 3.2
+        const spotGrad = ctx.createRadialGradient(
           mouse.x,
           mouse.y,
           0,
           mouse.x,
           mouse.y,
-          causticRadius
+          spotlightRadius
         )
 
         if (isDark) {
-          causticGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)')
-          causticGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.05)')
-          causticGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.015)')
-          causticGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+          spotGrad.addColorStop(0, 'rgba(255, 255, 255, 0.085)')
+          spotGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.03)')
+          spotGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.008)')
+          spotGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
         } else {
-          causticGrad.addColorStop(0, 'rgba(0, 0, 0, 0.09)')
-          causticGrad.addColorStop(0.3, 'rgba(0, 0, 0, 0.035)')
-          causticGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.01)')
-          causticGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+          spotGrad.addColorStop(0, 'rgba(0, 0, 0, 0.065)')
+          spotGrad.addColorStop(0.35, 'rgba(0, 0, 0, 0.022)')
+          spotGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.005)')
+          spotGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
         }
 
-        ctx.fillStyle = causticGrad
+        ctx.fillStyle = spotGrad
         ctx.beginPath()
-        ctx.arc(mouse.x, mouse.y, causticRadius, 0, Math.PI * 2)
+        ctx.arc(mouse.x, mouse.y, spotlightRadius, 0, Math.PI * 2)
         ctx.fill()
       }
 
@@ -445,7 +618,7 @@ export function FluidDynamicsCanvas() {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerdown', handlePointerDown)
       window.removeEventListener('pointerup', handlePointerUp)
-      document.removeEventListener('pointerleave', handlePointerLeave)
+      document.removeEventListener('mouseleave', handlePointerLeave)
       cancelAnimationFrame(animationFrameId)
     }
   }, [theme])
