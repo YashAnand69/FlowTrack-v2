@@ -1,5 +1,5 @@
 // ==============================================================================
-// FlowTrack Playful & Soothing Generative Ambient Soundscape (Lusion / Cozy Vibe)
+// FlowTrack Playful Generative Groove Engine (Upbeat, Bouncy, Catchy & Fun)
 // Synthesized natively via Web Audio API (0 external assets, zero latency)
 // ==============================================================================
 
@@ -9,18 +9,16 @@ class LusionAudioEngine {
   private bgmGain: GainNode | null = null
   private sfxGain: GainNode | null = null
 
-  // Ambient BGM Nodes
+  // Playful BGM Engine Variables
   private isBgmActive: boolean = false
-  private bgmOscillators: Array<{ osc: OscillatorNode; gain: GainNode }> = []
   private bgmIntervalId: any = null
-  private chordIntervalId: any = null
-  private bassIntervalId: any = null
+  private stepCounter: number = 0
   private filterNode: BiquadFilterNode | null = null
   private delayNode: DelayNode | null = null
   private delayFeedback: GainNode | null = null
 
   // Volume staging
-  private bgmVolume: number = 0.52
+  private bgmVolume: number = 0.55
   private sfxVolume: number = 0.45
   private listeners: Set<(isPlaying: boolean) => void> = new Set()
 
@@ -52,12 +50,12 @@ class LusionAudioEngine {
       this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime)
       this.sfxGain.connect(this.masterGain)
 
-      // Playful Stereo Delay / Spatial Reverb Bus
+      // Bouncy Stereo Ping-Pong Delay Bus
       this.delayNode = this.ctx.createDelay()
-      this.delayNode.delayTime.setValueAtTime(0.28, this.ctx.currentTime)
+      this.delayNode.delayTime.setValueAtTime(0.18, this.ctx.currentTime)
 
       this.delayFeedback = this.ctx.createGain()
-      this.delayFeedback.gain.setValueAtTime(0.38, this.ctx.currentTime)
+      this.delayFeedback.gain.setValueAtTime(0.32, this.ctx.currentTime)
 
       this.delayNode.connect(this.delayFeedback)
       this.delayFeedback.connect(this.delayNode)
@@ -88,7 +86,7 @@ class LusionAudioEngine {
   }
 
   // ============================================================================
-  // PLAYFUL & SOOTHING GENERATIVE BGM (COZY KALIMBA & RHODES ARPEGGIOS)
+  // UPBEAT & PLAYFUL GENERATIVE SYNTH-GROOVE BGM (120 BPM)
   // ============================================================================
   public toggleBGM(): boolean {
     const ctx = this.ensureContext()
@@ -112,195 +110,199 @@ class LusionAudioEngine {
 
     const now = ctx.currentTime
 
-    // 1. Warm Cozy Filter (Warm Rhodes & Kalimba Timbre)
+    // 1. Crisp Dynamic Lowpass Filter
     this.filterNode = ctx.createBiquadFilter()
     this.filterNode.type = 'lowpass'
-    this.filterNode.frequency.setValueAtTime(1400, now)
-    this.filterNode.Q.setValueAtTime(1.2, now)
+    this.filterNode.frequency.setValueAtTime(2800, now)
+    this.filterNode.Q.setValueAtTime(1.5, now)
     this.filterNode.connect(this.bgmGain)
 
-    // 2. Playful & Comforting Chord Progression (Cmaj9 -> Am9 -> Dm9 -> G13)
-    const progression = [
+    // 2. Playful Chord & Bass Progression Map (C -> Am -> F -> G)
+    const patterns = [
       {
-        bass: 65.41, // C2
-        chord: [130.81, 164.81, 246.94, 293.66, 329.63], // C3, E3, B3, D4, E4 (Cmaj9)
+        bassNotes: [65.41, 65.41, 130.81, 98.0], // C2, C2, C3, G2
+        stabs: [261.63, 329.63, 392.0, 493.88],  // C4, E4, G4, B4 (Cmaj7)
+        melodyPool: [261.63, 293.66, 329.63, 392.0, 523.25, 659.25, 783.99],
       },
       {
-        bass: 55.0, // A1
-        chord: [110.0, 164.81, 196.0, 261.63, 329.63], // A2, E3, G3, C4, E4 (Am9)
+        bassNotes: [55.0, 55.0, 110.0, 82.41],   // A1, A1, A2, E2
+        stabs: [220.0, 261.63, 329.63, 392.0],   // A3, C4, E4, G4 (Am7)
+        melodyPool: [220.0, 261.63, 329.63, 440.0, 523.25, 659.25, 880.0],
       },
       {
-        bass: 73.42, // D2
-        chord: [146.83, 174.61, 220.0, 261.63, 329.63], // D3, F3, A3, C4, E4 (Dm9)
+        bassNotes: [43.65, 87.31, 130.81, 87.31], // F1, F2, C3, F2
+        stabs: [174.61, 220.0, 261.63, 329.63],  // F3, A3, C4, E4 (Fmaj7)
+        melodyPool: [261.63, 329.63, 349.23, 392.0, 523.25, 659.25, 698.46],
       },
       {
-        bass: 98.0, // G2
-        chord: [146.83, 174.61, 246.94, 329.63, 440.0], // D3, F3, B3, E4, A4 (G13)
+        bassNotes: [49.0, 98.0, 146.83, 110.0],  // G1, G2, D3, A2
+        stabs: [196.0, 246.94, 293.66, 349.23],  // G3, B3, D4, F4 (G7)
+        melodyPool: [246.94, 293.66, 392.0, 493.88, 587.33, 783.99, 987.77],
       },
     ]
 
-    let stepIndex = 0
+    this.stepCounter = 0
+    const stepTimeMs = 125 // 16th note at 120 BPM
 
-    // Warm Rhodes electric piano background pad
-    const playWarmPad = (chordNotes: number[]) => {
+    // Synth Drum / Woodblock Click
+    const playClickBeat = (isAccent: boolean) => {
       if (!this.isBgmActive || !ctx || !this.filterNode) return
-
-      // Smoothly release previous pad voices
-      this.bgmOscillators.forEach(({ osc, gain }) => {
-        try {
-          const t = ctx.currentTime
-          gain.gain.cancelScheduledValues(t)
-          gain.gain.linearRampToValueAtTime(0, t + 0.9)
-          setTimeout(() => {
-            try {
-              osc.stop()
-              osc.disconnect()
-            } catch {}
-          }, 950)
-        } catch {}
-      })
-      this.bgmOscillators = []
-
-      const chordTime = ctx.currentTime
-
-      chordNotes.forEach((freq, idx) => {
-        if (!ctx || !this.filterNode) return
-
-        const osc = ctx.createOscillator()
-        const voiceGain = ctx.createGain()
-        const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
-
-        osc.type = idx % 2 === 0 ? 'triangle' : 'sine'
-        osc.frequency.setValueAtTime(freq, chordTime)
-
-        // Subtle slow chorus detuning for a cozy vintage vibe
-        const detune = (idx - 2) * 4 + Math.sin(chordTime * 0.5) * 3
-        osc.detune.setValueAtTime(detune, chordTime)
-
-        // Gentle envelope
-        const targetVol = idx === 0 ? 0.12 : 0.08
-        voiceGain.gain.setValueAtTime(0, chordTime)
-        voiceGain.gain.linearRampToValueAtTime(targetVol, chordTime + 0.6)
-
-        if (panner) {
-          panner.pan.setValueAtTime((idx - 2) * 0.25, chordTime)
-          osc.connect(voiceGain)
-          voiceGain.connect(panner)
-          panner.connect(this.filterNode)
-        } else {
-          osc.connect(voiceGain)
-          voiceGain.connect(this.filterNode)
-        }
-
-        osc.start(chordTime)
-        this.bgmOscillators.push({ osc, gain: voiceGain })
-      })
-    }
-
-    // Cozy Acoustic Bass Pluck (Warm bounce)
-    const playCozyBass = (bassFreq: number) => {
-      if (!this.isBgmActive || !ctx || !this.filterNode) return
-
       const t = ctx.currentTime
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
 
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(bassFreq, t)
-      osc.frequency.exponentialRampToValueAtTime(bassFreq * 0.95, t + 0.6)
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(isAccent ? 1200 : 750, t)
+      osc.frequency.exponentialRampToValueAtTime(120, t + 0.025)
 
       gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(0.24, t + 0.03)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.6)
+      gain.gain.linearRampToValueAtTime(isAccent ? 0.08 : 0.04, t + 0.003)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.03)
 
       osc.connect(gain)
       gain.connect(this.filterNode)
 
       osc.start(t)
-      osc.stop(t + 1.65)
+      osc.stop(t + 0.035)
     }
 
-    // Play first step immediately
-    playWarmPad(progression[0].chord)
-    playCozyBass(progression[0].bass)
-
-    // Progression cycle every 4.8 seconds
-    this.chordIntervalId = setInterval(() => {
-      if (!this.isBgmActive) return
-      stepIndex = (stepIndex + 1) % progression.length
-      playWarmPad(progression[stepIndex].chord)
-      playCozyBass(progression[stepIndex].bass)
-    }, 4800)
-
-    // 3. Playful Wooden Kalimba / Music Box Melodic Plucks
-    // Pentatonic scale in high octaves: C4, D4, E4, G4, A4, C5, D5, E5, G5, A5, C6
-    const kalimbaScale = [
-      261.63, 293.66, 329.63, 392.0, 440.0,
-      523.25, 587.33, 659.25, 783.99, 880.0, 1046.5,
-    ]
-
-    const triggerPlayfulKalimba = () => {
+    // Bouncy Synth Bass Pluck
+    const playBassNote = (freq: number) => {
       if (!this.isBgmActive || !ctx || !this.filterNode) return
+      const t = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
-      const noteTime = ctx.currentTime
-      // Pick playful note from scale
-      const noteFreq = kalimbaScale[Math.floor(Math.random() * kalimbaScale.length)]
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(freq, t)
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.96, t + 0.08)
 
-      // Dual-oscillator kalimba voice (Triangle for wooden transient + Sine for sweet chime body)
-      const osc1 = ctx.createOscillator()
-      const osc2 = ctx.createOscillator()
-      const noteGain = ctx.createGain()
-      const notePanner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.008)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
 
-      osc1.type = 'triangle'
-      osc1.frequency.setValueAtTime(noteFreq, noteTime)
-      // Rapid pitch decay for wooden pluck strike
-      osc1.frequency.exponentialRampToValueAtTime(noteFreq * 0.98, noteTime + 0.04)
+      // Punchy Bass Filter
+      const bassFilter = ctx.createBiquadFilter()
+      bassFilter.type = 'lowpass'
+      bassFilter.frequency.setValueAtTime(480, t)
+      bassFilter.frequency.exponentialRampToValueAtTime(140, t + 0.2)
 
-      osc2.type = 'sine'
-      osc2.frequency.setValueAtTime(noteFreq * 2, noteTime) // Harmonic sparkle
+      osc.connect(bassFilter)
+      bassFilter.connect(gain)
+      gain.connect(this.filterNode)
 
-      // Fast percussive attack, sweet bouncy ring
-      noteGain.gain.setValueAtTime(0, noteTime)
-      noteGain.gain.linearRampToValueAtTime(0.18, noteTime + 0.012)
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + 1.4)
+      osc.start(t)
+      osc.stop(t + 0.24)
+    }
 
-      osc1.connect(noteGain)
-      osc2.connect(noteGain)
+    // Playful Bubble / Marimba Pluck
+    const playBubbleNote = (freq: number, pan: number = 0) => {
+      if (!this.isBgmActive || !ctx || !this.filterNode) return
+      const t = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const oscHarmonic = ctx.createOscillator()
+      const gain = ctx.createGain()
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null
 
-      if (notePanner) {
-        // Random playful stereo bounce
-        notePanner.pan.setValueAtTime((Math.random() - 0.5) * 0.85, noteTime)
-        noteGain.connect(notePanner)
-        notePanner.connect(this.filterNode)
-        if (this.delayNode) {
-          notePanner.connect(this.delayNode)
-        }
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, t)
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.02, t + 0.02)
+      osc.frequency.exponentialRampToValueAtTime(freq, t + 0.08)
+
+      oscHarmonic.type = 'triangle'
+      oscHarmonic.frequency.setValueAtTime(freq * 2, t)
+
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(0.16, t + 0.006)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25)
+
+      osc.connect(gain)
+      oscHarmonic.connect(gain)
+
+      if (panner) {
+        panner.pan.setValueAtTime(pan, t)
+        gain.connect(panner)
+        panner.connect(this.filterNode)
+        if (this.delayNode) panner.connect(this.delayNode)
       } else {
-        noteGain.connect(this.filterNode)
-        if (this.delayNode) {
-          noteGain.connect(this.delayNode)
-        }
+        gain.connect(this.filterNode)
+        if (this.delayNode) gain.connect(this.delayNode)
       }
 
-      osc1.start(noteTime)
-      osc2.start(noteTime)
-      osc1.stop(noteTime + 1.45)
-      osc2.stop(noteTime + 1.45)
-
-      // Schedule next playful note with rhythmic syncopation (between 400ms and 1100ms)
-      const rhythms = [350, 480, 650, 800, 950]
-      const nextDelay = rhythms[Math.floor(Math.random() * rhythms.length)]
-      this.bgmIntervalId = setTimeout(triggerPlayfulKalimba, nextDelay)
+      osc.start(t)
+      oscHarmonic.start(t)
+      osc.stop(t + 0.28)
+      oscHarmonic.stop(t + 0.28)
     }
 
-    // Trigger first kalimba pluck right away
-    setTimeout(triggerPlayfulKalimba, 400)
+    // Upbeat Staccato Offbeat Chord Stab
+    const playChordStab = (notes: number[]) => {
+      if (!this.isBgmActive || !ctx || !this.filterNode) return
+      const t = ctx.currentTime
+
+      notes.forEach((freq) => {
+        if (!ctx || !this.filterNode) return
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, t)
+
+        gain.gain.setValueAtTime(0, t)
+        gain.gain.linearRampToValueAtTime(0.06, t + 0.006)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+
+        osc.connect(gain)
+        gain.connect(this.filterNode)
+
+        osc.start(t)
+        osc.stop(t + 0.14)
+      })
+    }
+
+    // Main 16th-note Playful Step Sequencer Loop
+    const runStep = () => {
+      if (!this.isBgmActive || !ctx) return
+
+      const barStep = this.stepCounter % 16 // 16 steps per bar
+      const currentBar = Math.floor(this.stepCounter / 16) % patterns.length
+      const pat = patterns[currentBar]
+
+      // 1. Playful Bass (Steps 0, 4, 8, 12, with occasional 16th bounce)
+      if (barStep === 0) playBassNote(pat.bassNotes[0])
+      if (barStep === 4) playBassNote(pat.bassNotes[1])
+      if (barStep === 8) playBassNote(pat.bassNotes[2])
+      if (barStep === 11 || barStep === 14) playBassNote(pat.bassNotes[3])
+
+      // 2. Offbeat Funky Chord Stabs (Steps 2, 6, 10, 14)
+      if (barStep === 2 || barStep === 6 || barStep === 10 || barStep === 14) {
+        playChordStab(pat.stabs)
+      }
+
+      // 3. Playful Bubble Marimba Melodies (Dancing arpeggios on steps)
+      const playMelodySteps = [0, 3, 6, 8, 10, 12, 15]
+      if (playMelodySteps.includes(barStep)) {
+        const noteIdx = (barStep + this.stepCounter) % pat.melodyPool.length
+        const pan = ((barStep % 4) - 1.5) * 0.5
+        playBubbleNote(pat.melodyPool[noteIdx], pan)
+      }
+
+      // 4. Subtle Percussive Groove (Every quarter note)
+      if (barStep % 4 === 0) {
+        playClickBeat(barStep === 0)
+      }
+
+      this.stepCounter++
+      this.bgmIntervalId = setTimeout(runStep, stepTimeMs)
+    }
+
+    // Start upbeat sequencer
+    runStep()
 
     // Smooth BGM Master Fade In
     this.bgmGain.gain.cancelScheduledValues(now)
     this.bgmGain.gain.setValueAtTime(0, now)
-    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.6)
+    this.bgmGain.gain.linearRampToValueAtTime(this.bgmVolume, now + 0.4)
   }
 
   public stopBGM() {
@@ -314,33 +316,13 @@ class LusionAudioEngine {
       this.bgmIntervalId = null
     }
 
-    if (this.chordIntervalId) {
-      clearInterval(this.chordIntervalId)
-      this.chordIntervalId = null
-    }
-
-    if (this.bassIntervalId) {
-      clearInterval(this.bassIntervalId)
-      this.bassIntervalId = null
-    }
-
     const now = this.ctx.currentTime
     this.bgmGain.gain.cancelScheduledValues(now)
-    this.bgmGain.gain.linearRampToValueAtTime(0, now + 0.7)
-
-    setTimeout(() => {
-      this.bgmOscillators.forEach(({ osc }) => {
-        try {
-          osc.stop()
-          osc.disconnect()
-        } catch {}
-      })
-      this.bgmOscillators = []
-    }, 750)
+    this.bgmGain.gain.linearRampToValueAtTime(0, now + 0.4)
   }
 
   // ============================================================================
-  // TACTILE LUXURY SOUND EFFECTS (SFX)
+  // TACTILE SOUND EFFECTS (SFX)
   // ============================================================================
 
   // Subtle acoustic hover tick
@@ -426,7 +408,6 @@ class LusionAudioEngine {
     try {
       const now = ctx.currentTime
 
-      // 1. Visceral Liquid Paint Surge Wave
       const waveOsc = ctx.createOscillator()
       const waveGain = ctx.createGain()
       const waveFilter = ctx.createBiquadFilter()
@@ -452,7 +433,6 @@ class LusionAudioEngine {
       waveOsc.start(now)
       waveOsc.stop(now + 0.95)
 
-      // 2. Liquid Paint Splatter Droplets
       const dropletFreqs = isDark
         ? [380, 520, 680, 440]
         : [440, 680, 520, 380]
