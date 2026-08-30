@@ -179,9 +179,9 @@ export function TopBar({
         <motion.button
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
-          onClick={(e) => {
+          onClick={() => {
             soundEngine.playChime(theme === 'light')
-            toggleTheme(e)
+            toggleTheme()
           }}
           className="p-2 rounded-xl text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] border border-transparent hover:border-black/5 dark:hover:border-white/10 transition-colors cursor-pointer"
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

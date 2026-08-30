@@ -269,9 +269,9 @@ export default function SettingsPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={(e) => {
+              onClick={() => {
                 soundEngine.playChime(false)
-                setTheme('light', e)
+                setTheme('light')
               }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'light'
@@ -293,9 +293,9 @@ export default function SettingsPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={(e) => {
+              onClick={() => {
                 soundEngine.playChime(true)
-                setTheme('dark', e)
+                setTheme('dark')
               }}
               className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 theme === 'dark'
