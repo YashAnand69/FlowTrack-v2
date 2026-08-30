@@ -403,32 +403,63 @@ class LusionAudioEngine {
     } catch {}
   }
 
-  // Meditative Mode Transition Chord (Slow soothing singing bowl / crystal pad)
+  // Liquid Paint Splash & Fluid Wave Sound
   public playChime(isDark: boolean = true) {
     const ctx = this.ensureContext()
     if (!ctx || !this.sfxGain) return
     try {
       const now = ctx.currentTime
-      // Meditative 432Hz harmonic chord: F3, C4, A4 / C4, G4, E5
-      const freqs = isDark ? [174.61, 261.63, 440.0] : [261.63, 392.0, 659.25]
-      freqs.forEach((freq, idx) => {
+
+      // 1. Visceral Liquid Paint Surge Wave (Resonant low-mid water sweep)
+      const waveOsc = ctx.createOscillator()
+      const waveGain = ctx.createGain()
+      const waveFilter = ctx.createBiquadFilter()
+
+      waveOsc.type = 'triangle'
+      waveOsc.frequency.setValueAtTime(isDark ? 140 : 180, now)
+      waveOsc.frequency.exponentialRampToValueAtTime(isDark ? 280 : 360, now + 0.25)
+      waveOsc.frequency.exponentialRampToValueAtTime(isDark ? 95 : 120, now + 0.8)
+
+      waveFilter.type = 'lowpass'
+      waveFilter.frequency.setValueAtTime(450, now)
+      waveFilter.frequency.linearRampToValueAtTime(900, now + 0.3)
+      waveFilter.frequency.linearRampToValueAtTime(250, now + 0.85)
+
+      waveGain.gain.setValueAtTime(0, now)
+      waveGain.gain.linearRampToValueAtTime(0.18, now + 0.15)
+      waveGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9)
+
+      waveOsc.connect(waveFilter)
+      waveFilter.connect(waveGain)
+      waveGain.connect(this.sfxGain)
+
+      waveOsc.start(now)
+      waveOsc.stop(now + 0.95)
+
+      // 2. Liquid Paint Splatter Droplets (Bubble pops)
+      const dropletFreqs = isDark
+        ? [380, 520, 680, 440]
+        : [440, 680, 520, 380]
+
+      dropletFreqs.forEach((freq, idx) => {
         if (!ctx || !this.sfxGain) return
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
+        const dropOsc = ctx.createOscillator()
+        const dropGain = ctx.createGain()
 
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now)
+        const triggerAt = now + 0.1 + idx * 0.08
+        dropOsc.type = 'sine'
+        dropOsc.frequency.setValueAtTime(freq * 1.4, triggerAt)
+        dropOsc.frequency.exponentialRampToValueAtTime(freq * 0.7, triggerAt + 0.06)
 
-        // Slow swelling envelope (0.4s attack, 1.2s smooth decay)
-        gain.gain.setValueAtTime(0, now)
-        gain.gain.linearRampToValueAtTime(0.09, now + 0.35 + idx * 0.05)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5)
+        dropGain.gain.setValueAtTime(0, triggerAt)
+        dropGain.gain.linearRampToValueAtTime(0.09, triggerAt + 0.01)
+        dropGain.gain.exponentialRampToValueAtTime(0.0001, triggerAt + 0.15)
 
-        osc.connect(gain)
-        gain.connect(this.sfxGain)
+        dropOsc.connect(dropGain)
+        dropGain.connect(this.sfxGain)
 
-        osc.start(now)
-        osc.stop(now + 1.55)
+        dropOsc.start(triggerAt)
+        dropOsc.stop(triggerAt + 0.18)
       })
     } catch {}
   }

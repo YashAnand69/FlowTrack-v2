@@ -7,12 +7,14 @@ export type Theme = 'light' | 'dark'
 interface ThemeTransitionState {
   isTransitioning: boolean
   targetTheme: Theme | null
+  originX: number
+  originY: number
 }
 
 interface ThemeContextType {
   theme: Theme
-  toggleTheme: () => void
-  setTheme: (theme: Theme) => void
+  toggleTheme: (event?: React.MouseEvent | MouseEvent) => void
+  setTheme: (theme: Theme, event?: React.MouseEvent | MouseEvent) => void
   transitionState: ThemeTransitionState
 }
 
@@ -23,6 +25,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [transitionState, setTransitionState] = useState<ThemeTransitionState>({
     isTransitioning: false,
     targetTheme: null,
+    originX: typeof window !== 'undefined' ? window.innerWidth - 80 : 500,
+    originY: 40,
   })
   const transitionTimeoutRef = useRef<any>(null)
 
@@ -49,38 +53,50 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const setTheme = (t: Theme) => {
+  const setTheme = (t: Theme, event?: React.MouseEvent | MouseEvent) => {
     if (t === theme && !transitionState.isTransitioning) return
 
     if (transitionTimeoutRef.current) {
       clearTimeout(transitionTimeoutRef.current)
     }
 
-    // Step 1: Start deliberate, unhurried cinematic transition (1.65s total)
+    let originX = typeof window !== 'undefined' ? window.innerWidth - 80 : 500
+    let originY = 40
+
+    if (event && event.clientX && event.clientY) {
+      originX = event.clientX
+      originY = event.clientY
+    }
+
+    // Step 1: Start organic liquid paint flood (1.4s total)
     setTransitionState({
       isTransitioning: true,
       targetTheme: t,
+      originX,
+      originY,
     })
 
-    // Step 2: Swap the underlying DOM theme cleanly at peak meditative mist (650ms)
+    // Step 2: Swap the underlying DOM theme cleanly when paint has 100% engulfed screen (620ms)
     setTimeout(() => {
       setThemeState(t)
       applyThemeClass(t)
       localStorage.setItem('flowtrack_theme', t)
-    }, 650)
+    }, 620)
 
-    // Step 3: Dissolve the mist gracefully (1650ms)
+    // Step 3: Complete paint settlement (1400ms)
     transitionTimeoutRef.current = setTimeout(() => {
       setTransitionState({
         isTransitioning: false,
         targetTheme: null,
+        originX: typeof window !== 'undefined' ? window.innerWidth - 80 : 500,
+        originY: 40,
       })
-    }, 1650)
+    }, 1400)
   }
 
-  const toggleTheme = () => {
+  const toggleTheme = (event?: React.MouseEvent | MouseEvent) => {
     const next = theme === 'light' ? 'dark' : 'light'
-    setTheme(next)
+    setTheme(next, event)
   }
 
   return (
