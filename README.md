@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowTrack
 
-## Getting Started
+FlowTrack is a freelance finance workspace for tracking clients, invoices, payments, and cash flow. The dashboard summarizes invoice activity and revenue; client and invoice screens support the day-to-day workflow, including invoice previews.
 
-First, run the development server:
+This is a portfolio project, not a hosted financial service. Configure your own backend before using it with real data.
+
+## Run locally
+
+Use a recent Node.js release and run:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The application expects one configured backend:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Supabase:** set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, then apply `supabase/schema.sql` to your own project.
+- **Firebase:** set `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`, `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID`. Deploy `firestore.rules` in that project.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Firebase is selected when its required client configuration is present; otherwise the app uses the Supabase path. The fallback Firebase configuration in source is illustrative and does not connect to a usable backend. Do not put a Supabase service-role key or other server secret in a `NEXT_PUBLIC_` variable.
 
-## Learn More
+## Implementation
 
-To learn more about Next.js, take a look at the following resources:
+Next.js 16, React 19, TypeScript, Tailwind CSS, Recharts, Supabase, and Firebase. The Supabase schema includes ownership-based row-level security for profiles, clients, invoices, and invoice items. Firebase rules scope user documents to the signed-in user. Review and deploy the relevant rules before connecting production data.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run `npm run lint` and `npm run build` for local verification. No production deployment is included in this repository.
